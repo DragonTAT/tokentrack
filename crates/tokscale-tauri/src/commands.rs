@@ -1,7 +1,7 @@
 use tauri::State;
-use tokscale_core::{GraphResult, ModelReport, MonthlyReport, ReportOptions, GroupBy};
+use tokscale_core::{GraphResult, GroupBy, ModelReport, MonthlyReport, ReportOptions};
 
-use crate::state::{SharedCache, TodaySummary, compute_today_summary, refresh_cache};
+use crate::state::{compute_today_summary, refresh_cache, SharedCache, TodaySummary};
 
 fn make_options(
     since: Option<String>,
@@ -33,11 +33,14 @@ pub async fn get_today_summary(cache: State<'_, SharedCache>) -> Result<TodaySum
             drop(c);
             refresh_cache(&cache).await?;
             let c = cache.read().await;
-            Ok(c.graph.as_ref().map(compute_today_summary).unwrap_or(TodaySummary {
-                total_tokens: 0,
-                total_cost: 0.0,
-                clients: vec![],
-            }))
+            Ok(c.graph
+                .as_ref()
+                .map(compute_today_summary)
+                .unwrap_or(TodaySummary {
+                    total_tokens: 0,
+                    total_cost: 0.0,
+                    clients: vec![],
+                }))
         }
     }
 }

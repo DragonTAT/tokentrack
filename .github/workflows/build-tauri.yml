@@ -12,12 +12,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-14        # Apple Silicon (arm64)
+          - platform: macos-14        # Apple Silicon runner — native arm64 build
             target: aarch64-apple-darwin
-            arch: arm64
-          - platform: macos-13        # Intel (x86_64)
+          - platform: macos-14        # Apple Silicon runner — cross-compile for Intel
             target: x86_64-apple-darwin
-            arch: x64
 
     runs-on: ${{ matrix.platform }}
 
@@ -29,7 +27,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Rust stable
+      - name: Install Rust stable + target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -38,24 +36,24 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
+          key: ${{ matrix.target }}
 
       - name: Install frontend dependencies
         working-directory: apps/tauri-ui
         run: npm install
 
       - name: Import Apple certificate
+        # Only run when secrets are configured
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Create a temporary keychain
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          # Import certificate
           echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/cert.p12
           security import /tmp/cert.p12 -P "$APPLE_CERTIFICATE_PASSWORD" \
             -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
@@ -90,4 +88,4 @@ jobs:
       - name: Clean up keychain
         if: always()
         run: |
-          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" || true
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true

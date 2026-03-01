@@ -60,7 +60,6 @@
       "entitlements": "entitlements.plist",
       "frameworks": [],
       "exceptionDomain": "",
-      "signingIdentity": null,
       "hardenedRuntime": true
     }
   }

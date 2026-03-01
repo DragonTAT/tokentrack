@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokscale_core::{GraphResult, ModelReport, ReportOptions, GroupBy};
+use tokscale_core::{GraphResult, GroupBy, ModelReport, ReportOptions};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TodaySummary {
@@ -16,20 +16,11 @@ pub struct ClientSummary {
     pub cost: f64,
 }
 
+#[derive(Default)]
 pub struct AppCache {
     pub graph: Option<GraphResult>,
     pub model_report: Option<ModelReport>,
     pub last_refresh: Option<std::time::Instant>,
-}
-
-impl Default for AppCache {
-    fn default() -> Self {
-        Self {
-            graph: None,
-            model_report: None,
-            last_refresh: None,
-        }
-    }
 }
 
 pub type SharedCache = Arc<RwLock<AppCache>>;
@@ -64,10 +55,7 @@ pub async fn refresh_cache(cache: &SharedCache) -> Result<(), String> {
 pub fn compute_today_summary(graph: &GraphResult) -> TodaySummary {
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
-    let day = graph
-        .contributions
-        .iter()
-        .find(|d| d.date == today);
+    let day = graph.contributions.iter().find(|d| d.date == today);
 
     match day {
         None => TodaySummary {
@@ -87,7 +75,11 @@ pub fn compute_today_summary(graph: &GraphResult) -> TodaySummary {
 
             let mut clients: Vec<ClientSummary> = client_map
                 .into_iter()
-                .map(|(client, (tokens, cost))| ClientSummary { client, tokens, cost })
+                .map(|(client, (tokens, cost))| ClientSummary {
+                    client,
+                    tokens,
+                    cost,
+                })
                 .collect();
             clients.sort_by(|a, b| b.tokens.cmp(&a.tokens));
 

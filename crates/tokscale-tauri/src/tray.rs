@@ -1,11 +1,12 @@
 use tauri::{
-    App, AppHandle, Manager,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    App, AppHandle, Manager,
 };
 
 pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
-    let open_dashboard = MenuItem::with_id(app, "open_dashboard", "Open Dashboard", true, None::<&str>)?;
+    let open_dashboard =
+        MenuItem::with_id(app, "open_dashboard", "Open Dashboard", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit TokenTrack", true, None::<&str>)?;
 
@@ -68,10 +69,14 @@ pub fn toggle_popover(app: &AppHandle) {
 
 fn position_popover_near_tray(app: &AppHandle, window: &tauri::WebviewWindow) {
     // Get tray icon rect from the tray icon itself
-    let Some(tray) = app.tray_by_id("main-tray") else { return };
+    let Some(tray) = app.tray_by_id("main-tray") else {
+        return;
+    };
     let Ok(Some(rect)) = tray.rect() else { return };
 
-    let win_size = window.outer_size().unwrap_or(tauri::PhysicalSize::new(380u32, 520u32));
+    let win_size = window
+        .outer_size()
+        .unwrap_or(tauri::PhysicalSize::new(380u32, 520u32));
 
     // Extract physical position — convert from logical if needed using scale factor 1.0
     let scale = window.scale_factor().unwrap_or(1.0);
