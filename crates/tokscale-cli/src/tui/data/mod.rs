@@ -634,7 +634,7 @@ mod tests {
     #[test]
     fn test_client_all() {
         let clients = ClientId::ALL;
-        assert_eq!(clients.len(), 10);
+        assert_eq!(clients.len(), 11);
         assert_eq!(clients[0], ClientId::OpenCode);
         assert_eq!(clients[1], ClientId::Claude);
         assert_eq!(clients[2], ClientId::Codex);
@@ -645,6 +645,7 @@ mod tests {
         assert_eq!(clients[7], ClientId::OpenClaw);
         assert_eq!(clients[8], ClientId::Pi);
         assert_eq!(clients[9], ClientId::Kimi);
+        assert_eq!(clients[10], ClientId::Antigravity);
     }
 
     #[test]
@@ -732,7 +733,11 @@ mod tests {
             crate::tui::client_ui::from_hotkey('0'),
             Some(ClientId::Kimi)
         );
-        assert_eq!(crate::tui::client_ui::from_hotkey('a'), None);
+        assert_eq!(
+            crate::tui::client_ui::from_hotkey('a'),
+            Some(ClientId::Antigravity)
+        );
+        assert_eq!(crate::tui::client_ui::from_hotkey('z'), None);
     }
 
     #[test]
