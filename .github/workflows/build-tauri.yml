@@ -19,12 +19,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-14        # Apple Silicon runner — native arm64 build
-            target: aarch64-apple-darwin
-          - platform: macos-14        # Apple Silicon runner — cross-compile for Intel
-            target: x86_64-apple-darwin
+          - target: aarch64-apple-darwin
+            name: arm64
+          - target: x86_64-apple-darwin
+            name: x64
 
-    runs-on: ${{ matrix.platform }}
+    runs-on: macos-14
 
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +33,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: "npm"
+          cache-dependency-path: apps/tauri-ui/package-lock.json
 
       - name: Install Rust stable + target
         uses: dtolnay/rust-toolchain@stable
@@ -47,7 +49,11 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: apps/tauri-ui
-        run: npm install
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: apps/tauri-ui
+        run: npm run build
 
       - name: Import Apple certificate
         env:
@@ -55,12 +61,10 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Skip if no certificate is configured
           if [ -z "$APPLE_CERTIFICATE" ]; then
             echo "No Apple certificate configured — skipping signing setup"
             exit 0
           fi
-
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -71,6 +75,18 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
           rm /tmp/cert.p12
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Build Tauri app
+        working-directory: crates/tokscale-tauri
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: cargo tauri build --target ${{ matrix.target }}
+
       - name: Resolve tag name
         id: tag
         run: |
@@ -80,30 +96,24 @@ jobs:
             echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Upload DMG to Release
+        uses: softprops/action-gh-release@v2
         with:
-          tagName: ${{ steps.tag.outputs.name }}
-          releaseName: "TokenTrack ${{ steps.tag.outputs.name }}"
-          releaseBody: |
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: "TokenTrack ${{ steps.tag.outputs.name }}"
+          body: |
             ## TokenTrack ${{ steps.tag.outputs.name }}
 
             macOS menu bar app for tracking AI token usage across Claude Code, Gemini CLI, Cursor, and more.
 
             ### Installation
-            1. Download the `.dmg` for your Mac (Apple Silicon or Intel)
+            1. Download the `.dmg` for your Mac (Apple Silicon → arm64, Intel → x64)
             2. Open the DMG and drag TokenTrack to Applications
             3. Launch TokenTrack — it lives in your menu bar
-          releaseDraft: false
+          draft: false
           prerelease: false
-          projectPath: crates/tokscale-tauri
-          args: --target ${{ matrix.target }}
+          files: |
+            crates/tokscale-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
 
       - name: Clean up keychain
         if: always()

@@ -160,7 +160,11 @@ pub fn scan_all_clients(home_dir: &str, clients: &[String]) -> ScanResult {
     for client_id in &enabled {
         if matches!(
             client_id,
-            ClientId::OpenCode | ClientId::Codex | ClientId::OpenClaw | ClientId::Gemini | ClientId::Antigravity
+            ClientId::OpenCode
+                | ClientId::Codex
+                | ClientId::OpenClaw
+                | ClientId::Gemini
+                | ClientId::Antigravity
         ) {
             continue;
         }

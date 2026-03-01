@@ -87,8 +87,7 @@ fn parse_for_source(path: &Path, source: &str) -> Vec<UnifiedMessage> {
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
-        let messages =
-            parse_gemini_headless_value(&value, &session_id, source, fallback_timestamp);
+        let messages = parse_gemini_headless_value(&value, &session_id, source, fallback_timestamp);
         if !messages.is_empty() {
             return messages;
         }
