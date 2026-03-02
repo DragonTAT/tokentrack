@@ -607,7 +607,7 @@ pub async fn get_model_report(options: ReportOptions) -> Result<ModelReport, Str
             .collect()
     });
 
-    let pricing = pricing::PricingService::get_or_init().await?;
+    let pricing = pricing::PricingService::get_or_init().await;
     let all_messages = parse_all_messages_with_pricing(&home_dir, &clients, &pricing);
 
     let filtered = filter_messages_for_report(all_messages, &options);
@@ -732,7 +732,7 @@ pub async fn get_monthly_report(options: ReportOptions) -> Result<MonthlyReport,
             .collect()
     });
 
-    let pricing = pricing::PricingService::get_or_init().await?;
+    let pricing = pricing::PricingService::get_or_init().await;
     let all_messages = parse_all_messages_with_pricing(&home_dir, &clients, &pricing);
 
     let filtered = filter_messages_for_report(all_messages, &options);
@@ -796,7 +796,7 @@ pub async fn generate_graph(options: ReportOptions) -> Result<GraphResult, Strin
             .collect()
     });
 
-    let pricing = pricing::PricingService::get_or_init().await?;
+    let pricing = pricing::PricingService::get_or_init().await;
     let all_messages = parse_all_messages_with_pricing(&home_dir, &clients, &pricing);
 
     let filtered = filter_messages_for_report(all_messages, &options);
