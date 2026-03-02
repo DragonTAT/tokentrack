@@ -78,28 +78,7 @@ cd /Users/chen/Desktop/claude/tokentrack
 ./target/release/tokscale models --json --no-spinner
 ```
 
-## Signed DMG Release
 
-Use the release packager script to build a macOS `.app`, then output `.zip` and `.dmg` artifacts:
-
-```bash
-cd /Users/chen/Desktop/claude/tokentrack
-./scripts/macos/release_signed_dmg.sh 3.0.1
-```
-
-For Developer ID signing and Apple notarization, set these environment variables before running:
-
-- `SIGNING_IDENTITY` (example: `Developer ID Application: Your Name (TEAMID)`)
-- Notary API key mode:
-  - `APPLE_NOTARY_KEY_ID`
-  - `APPLE_NOTARY_ISSUER_ID`
-  - `APPLE_NOTARY_PRIVATE_KEY` (raw `.p8`) or `APPLE_NOTARY_PRIVATE_KEY_BASE64`
-- Or Apple ID mode:
-  - `APPLE_ID`
-  - `APPLE_APP_SPECIFIC_PASSWORD`
-  - `APPLE_TEAM_ID`
-
-Artifacts are generated in `dist/` as `Tokentrack.app`, `Tokentrack-vX.Y.Z-macos-arm64.zip`, and `Tokentrack-vX.Y.Z-macos-arm64.dmg`.
 
 ## Acknowledgment
 
