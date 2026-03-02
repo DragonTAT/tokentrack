@@ -84,7 +84,7 @@ Use the release packager script to build a macOS `.app`, then output `.zip` and 
 
 ```bash
 cd /Users/chen/Desktop/claude/tokentrack
-./scripts/macos/release_signed_dmg.sh 3.0.0
+./scripts/macos/release_signed_dmg.sh 3.0.1
 ```
 
 For Developer ID signing and Apple notarization, set these environment variables before running:
@@ -99,7 +99,7 @@ For Developer ID signing and Apple notarization, set these environment variables
   - `APPLE_APP_SPECIFIC_PASSWORD`
   - `APPLE_TEAM_ID`
 
-Artifacts are generated in `dist/`.
+Artifacts are generated in `dist/` as `Tokentrack.app`, `Tokentrack-vX.Y.Z-macos-arm64.zip`, and `Tokentrack-vX.Y.Z-macos-arm64.dmg`.
 
 ## Acknowledgment
 

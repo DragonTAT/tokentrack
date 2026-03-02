@@ -18,22 +18,22 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             binary_name: tokscale
-            archive_name: tokscale-macos-arm64.tar.gz
+            archive_name: Tokentrack-cli-macos-arm64.tar.gz
 
           - target: x86_64-apple-darwin
             os: macos-latest
             binary_name: tokscale
-            archive_name: tokscale-macos-x86_64.tar.gz
+            archive_name: Tokentrack-cli-macos-x86_64.tar.gz
 
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             binary_name: tokscale
-            archive_name: tokscale-linux-x86_64.tar.gz
+            archive_name: Tokentrack-cli-linux-x86_64.tar.gz
 
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             binary_name: tokscale
-            archive_name: tokscale-linux-arm64.tar.gz
+            archive_name: Tokentrack-cli-linux-arm64.tar.gz
 
     steps:
       - name: Checkout
@@ -137,10 +137,10 @@ jobs:
       - name: Upload macOS app artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: tokscale-macos-app
+          name: Tokentrack-macos-app
           path: |
-            dist/TokscaleMac-v${{ steps.version.outputs.value }}-macos-arm64.dmg
-            dist/TokscaleMac-v${{ steps.version.outputs.value }}-macos-arm64.zip
+            dist/Tokentrack-v${{ steps.version.outputs.value }}-macos-arm64.dmg
+            dist/Tokentrack-v${{ steps.version.outputs.value }}-macos-arm64.zip
           if-no-files-found: error
 
   release:

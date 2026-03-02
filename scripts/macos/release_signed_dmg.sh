@@ -2,8 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-APP_NAME="TokscaleMac"
-BUNDLE_ID="${BUNDLE_ID:-io.tokscale.mac}"
+APP_NAME="Tokentrack"
+SWIFT_PRODUCT_NAME="${SWIFT_PRODUCT_NAME:-TokscaleMac}"
+BUNDLE_ID="${BUNDLE_ID:-io.tokentrack.mac}"
 MIN_MACOS_VERSION="${MIN_MACOS_VERSION:-14.0}"
 
 VERSION="${1:-}"
@@ -23,7 +24,7 @@ DMG_PATH="$DIST_DIR/${APP_NAME}-v${VERSION}-macos-arm64.dmg"
 ZIP_PATH="$DIST_DIR/${APP_NAME}-v${VERSION}-macos-arm64.zip"
 
 RUST_BIN="$ROOT_DIR/target/release/tokscale"
-SWIFT_BIN="$ROOT_DIR/apps/TokscaleMac/.build/release/${APP_NAME}"
+SWIFT_BIN="$ROOT_DIR/apps/TokscaleMac/.build/release/${SWIFT_PRODUCT_NAME}"
 
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
 
