@@ -118,8 +118,8 @@ impl DataLoader {
             .to_string();
 
         let rt = Runtime::new()?;
-        let pricing_result = rt.block_on(async { PricingService::get_or_init().await });
-        let pricing = pricing_result.as_ref().ok();
+        let pricing_result = rt.block_on(PricingService::get_or_init());
+        let pricing = Some(pricing_result.as_ref());
 
         let sources: Vec<String> = enabled_clients
             .iter()

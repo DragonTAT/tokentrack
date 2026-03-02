@@ -38,6 +38,15 @@ pub fn load_cache<T: for<'de> Deserialize<'de>>(filename: &str) -> Option<T> {
     Some(cached.data)
 }
 
+/// Load cache ignoring TTL — returns stale data if the file exists and parses,
+/// even if the timestamp is expired. Used as a fallback when the network is unavailable.
+pub fn load_cache_ignore_ttl<T: for<'de> Deserialize<'de>>(filename: &str) -> Option<T> {
+    let path = get_cache_path(filename);
+    let content = fs::read_to_string(&path).ok()?;
+    let cached: CachedData<T> = serde_json::from_str(&content).ok()?;
+    Some(cached.data)
+}
+
 pub fn save_cache<T: Serialize>(filename: &str, data: &T) -> Result<(), std::io::Error> {
     let dir = get_cache_dir();
     fs::create_dir_all(&dir)?;

@@ -7,6 +7,29 @@ use tempfile::TempDir;
 
 // ── Fixture helpers ────────────────────────────────────────────────────────
 
+/// Pre-seed a valid pricing cache into the temp home dir so tests never hit the network.
+///
+/// Writes pricing-litellm.json under both the macOS and Linux cache dirs:
+///   macOS: <tmp>/Library/Caches/tokscale/
+///   Linux: <tmp>/.cache/tokscale/
+fn seed_pricing_cache(tmp: &Path) {
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // Minimal valid CachedData<PricingDataset> covering the models used in fixture tests.
+    let json = format!(
+        r#"{{"timestamp":{now_secs},"data":{{"claude-sonnet-4-20250514":{{"input_cost_per_token":3e-6,"output_cost_per_token":1.5e-5,"cache_creation_input_token_cost":3.75e-6,"cache_read_input_token_cost":3e-7}},"gpt-4o":{{"input_cost_per_token":2.5e-6,"output_cost_per_token":1e-5,"cache_creation_input_token_cost":null,"cache_read_input_token_cost":1.25e-6}}}}}}"#
+    );
+
+    for subdir in &["Library/Caches/tokscale", ".cache/tokscale"] {
+        let dir = tmp.join(subdir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("pricing-litellm.json"), &json).unwrap();
+    }
+}
+
 /// Create a temporary directory with minimal OpenCode fixture data.
 ///
 /// Layout:
@@ -16,6 +39,8 @@ use tempfile::TempDir;
 fn create_temp_fixture_dir() -> TempDir {
     let tmp = TempDir::new().expect("failed to create temp dir");
     let base = tmp.path();
+
+    seed_pricing_cache(base);
 
     // Session 1: two messages on 2024-06-15 using claude-sonnet-4
     let session1 = base.join(".local/share/opencode/storage/message/session1");
@@ -86,6 +111,9 @@ fn create_temp_fixture_dir() -> TempDir {
 fn create_empty_fixture_dir() -> TempDir {
     let tmp = TempDir::new().expect("failed to create temp dir");
     let base = tmp.path();
+
+    seed_pricing_cache(base);
+
     let opencode_dir = base.join(".local/share/opencode/storage/message");
     fs::create_dir_all(opencode_dir).unwrap();
     tmp
@@ -95,7 +123,8 @@ fn create_empty_fixture_dir() -> TempDir {
 fn cmd_with_home(tmp: &Path) -> Command {
     let mut cmd = cargo_bin_cmd!("tokscale");
     cmd.env("HOME", tmp)
-        .env("XDG_DATA_HOME", tmp.join(".local/share"));
+        .env("XDG_DATA_HOME", tmp.join(".local/share"))
+        .env("XDG_CACHE_HOME", tmp.join(".cache"));
     cmd
 }
 

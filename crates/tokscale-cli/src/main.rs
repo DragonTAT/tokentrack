@@ -1786,34 +1786,8 @@ fn run_pricing_lookup(
     };
 
     let rt = Runtime::new()?;
-    let result = match rt.block_on(async {
-        let svc = PricingService::get_or_init().await?;
-        Ok::<_, String>(svc.lookup_with_source(model_id, provider_normalized.as_deref()))
-    }) {
-        Ok(result) => result,
-        Err(err) => {
-            if let Some(pb) = spinner {
-                pb.finish_and_clear();
-            }
-            if json {
-                #[derive(serde::Serialize)]
-                #[serde(rename_all = "camelCase")]
-                struct ErrorOutput {
-                    error: String,
-                    model_id: String,
-                }
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&ErrorOutput {
-                        error: err,
-                        model_id: model_id.to_string(),
-                    })?
-                );
-                std::process::exit(1);
-            }
-            return Err(anyhow::anyhow!(err));
-        }
-    };
+    let svc = rt.block_on(PricingService::get_or_init());
+    let result = svc.lookup_with_source(model_id, provider_normalized.as_deref());
 
     if let Some(pb) = spinner {
         pb.finish_and_clear();

@@ -22,6 +22,14 @@ pub fn load_cached() -> Option<PricingDataset> {
     cache::load_cache(CACHE_FILENAME)
 }
 
+pub fn load_cached_ignore_ttl() -> Option<PricingDataset> {
+    cache::load_cache_ignore_ttl(CACHE_FILENAME)
+}
+
+pub fn load_builtin() -> Option<PricingDataset> {
+    serde_json::from_str(include_str!("builtin.json")).ok()
+}
+
 pub async fn fetch() -> Result<PricingDataset, reqwest::Error> {
     if let Some(cached) = load_cached() {
         return Ok(cached);

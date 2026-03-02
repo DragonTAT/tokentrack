@@ -81,21 +81,37 @@ impl PricingService {
         overrides
     }
 
-    async fn fetch_inner() -> Result<Self, String> {
+    async fn fetch_inner() -> Self {
         let (litellm_result, openrouter_data) =
             tokio::join!(litellm::fetch(), openrouter::fetch_all_mapped());
 
-        let litellm_data = litellm_result.map_err(|e| e.to_string())?;
-        let litellm_data = Self::filter_litellm_data(litellm_data);
+        let litellm_data = match litellm_result {
+            Ok(data) => data,
+            Err(e) => {
+                eprintln!("[tokscale] pricing fetch failed ({e}); trying stale cache");
+                litellm::load_cached_ignore_ttl()
+                    .or_else(|| {
+                        eprintln!("[tokscale] no stale cache; using built-in snapshot");
+                        litellm::load_builtin()
+                    })
+                    .unwrap_or_else(|| {
+                        eprintln!(
+                            "[tokscale] no pricing data available — costs will show as $0.00"
+                        );
+                        HashMap::new()
+                    })
+            }
+        };
 
-        Ok(Self::new(litellm_data, openrouter_data))
+        let litellm_data = Self::filter_litellm_data(litellm_data);
+        Self::new(litellm_data, openrouter_data)
     }
 
-    pub async fn get_or_init() -> Result<Arc<PricingService>, String> {
+    pub async fn get_or_init() -> Arc<PricingService> {
         PRICING_SERVICE
-            .get_or_try_init(|| async { Self::fetch_inner().await.map(Arc::new) })
+            .get_or_init(|| async { Arc::new(Self::fetch_inner().await) })
             .await
-            .map(Arc::clone)
+            .clone()
     }
 
     pub fn lookup_with_source(
