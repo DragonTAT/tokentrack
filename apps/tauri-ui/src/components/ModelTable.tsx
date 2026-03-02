@@ -45,8 +45,12 @@ export default function ModelTable({ report }: Props) {
             </tr>
           </thead>
           <tbody>
-            {report.entries.map((entry, i) => (
-              <ModelRow key={i} entry={entry} totalCost={report.total_cost} />
+            {report.entries.map((entry) => (
+              <ModelRow
+                key={`${entry.client}-${entry.provider}-${entry.model}`}
+                entry={entry}
+                totalCost={report.total_cost}
+              />
             ))}
           </tbody>
         </table>

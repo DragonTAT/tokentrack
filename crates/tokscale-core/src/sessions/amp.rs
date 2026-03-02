@@ -65,28 +65,6 @@ pub struct AmpThread {
     pub usage_ledger: Option<AmpUsageLedger>,
 }
 
-/// Get provider from model name
-fn get_provider_from_model(model: &str) -> &'static str {
-    let model_lower = model.to_lowercase();
-    if model_lower.contains("claude")
-        || model_lower.contains("opus")
-        || model_lower.contains("sonnet")
-        || model_lower.contains("haiku")
-    {
-        return "anthropic";
-    }
-    if model_lower.contains("gpt") || model_lower.contains("o1") || model_lower.contains("o3") {
-        return "openai";
-    }
-    if model_lower.contains("gemini") {
-        return "google";
-    }
-    if model_lower.contains("grok") {
-        return "xai";
-    }
-    "anthropic" // Default for Amp
-}
-
 /// Parse an Amp thread JSON file
 pub fn parse_amp_file(path: &Path) -> Vec<UnifiedMessage> {
     let content = match std::fs::read(path) {
@@ -155,7 +133,7 @@ pub fn parse_amp_file(path: &Path) -> Vec<UnifiedMessage> {
                 messages.push(UnifiedMessage::new(
                     "amp",
                     &model,
-                    get_provider_from_model(&model),
+                    super::utils::infer_provider_with_fallback(&model, "anthropic"),
                     thread_id.clone(),
                     timestamp,
                     TokenBreakdown {
@@ -199,7 +177,7 @@ pub fn parse_amp_file(path: &Path) -> Vec<UnifiedMessage> {
             messages.push(UnifiedMessage::new(
                 "amp",
                 &model,
-                get_provider_from_model(&model),
+                super::utils::infer_provider_with_fallback(&model, "anthropic"),
                 thread_id.clone(),
                 timestamp,
                 TokenBreakdown {
