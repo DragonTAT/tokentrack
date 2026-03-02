@@ -8,22 +8,38 @@ struct StatsTab: View {
     var body: some View {
         VStack(spacing: 0) {
             // Top: Contribution Graph
-            ScrollView(.horizontal, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    HStack {
-                        Text(" Contribution Graph (52 weeks) ")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundStyle(store.currentTheme.accent)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-
-                    ContribGraphView(selectedCell: $selectedCell)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 8)
+            VStack(spacing: 0) {
+                HStack {
+                    Text(" Contribution Graph (52 weeks) ")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(store.currentTheme.accent)
+                    Spacer()
                 }
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .overlay(alignment: .bottom) { Rectangle().fill(AppColors.border).frame(height: 1) }
+
+                ScrollViewReader { scrollProxy in
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        HStack(spacing: 0) {
+                            ContribGraphView(selectedCell: $selectedCell)
+                                .padding(.horizontal, 8)
+                                .padding(.bottom, 8)
+
+                            Color.clear
+                                .frame(width: 1, height: 1)
+                                .id("graph-end")
+                        }
+                    }
+                    .onAppear {
+                        scrollGraphToRight(scrollProxy)
+                    }
+                    .onChange(of: store.graphGrid?.weeks.count ?? 0) {
+                        scrollGraphToRight(scrollProxy)
+                    }
+                }
             }
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
             .frame(maxHeight: .infinity)
             .padding(4)
 
@@ -38,6 +54,14 @@ struct StatsTab: View {
                     .frame(height: 200)
                     .padding(.horizontal, 4)
                     .padding(.bottom, 4)
+            }
+        }
+    }
+
+    private func scrollGraphToRight(_ proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            withAnimation(.none) {
+                proxy.scrollTo("graph-end", anchor: .trailing)
             }
         }
     }

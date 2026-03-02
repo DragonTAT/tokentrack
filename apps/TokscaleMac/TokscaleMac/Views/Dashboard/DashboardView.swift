@@ -7,6 +7,15 @@ enum DashboardTab: String, CaseIterable, Identifiable {
     case stats = "Stats"
 
     var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .overview: return "chart.pie.fill"
+        case .models: return "server.rack"
+        case .daily: return "calendar"
+        case .stats: return "chart.bar.xaxis"
+        }
+    }
 }
 
 enum SortField: String, CaseIterable {
@@ -20,7 +29,7 @@ enum SortDirection {
     mutating func toggle() { self = self == .ascending ? .descending : .ascending }
 }
 
-/// Main dashboard window with 4 tabs matching the CLI TUI.
+/// Main dashboard window with a modern macOS native sidebar navigation.
 struct DashboardView: View {
     @Environment(DataStore.self) private var store
     @State private var currentTab: DashboardTab = .overview
@@ -29,142 +38,140 @@ struct DashboardView: View {
     @State private var refreshing = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header bar with tabs
-            headerBar
-
-            // Content area
-            Group {
-                switch currentTab {
-                case .overview:
-                    OverviewTab(sortField: $sortField, sortDirection: $sortDirection)
-                case .models:
-                    ModelsTab(sortField: $sortField, sortDirection: $sortDirection)
-                case .daily:
-                    DailyTab(sortField: $sortField, sortDirection: $sortDirection)
-                case .stats:
-                    StatsTab()
+        NavigationSplitView {
+            // MARK: - Sidebar
+            List(selection: $currentTab) {
+                Text("TokenTrack")
+                    .font(.headline)
+                    .foregroundStyle(store.currentTheme.accent)
+                    .padding(.vertical, 8)
+                
+                ForEach(DashboardTab.allCases) { tab in
+                    NavigationLink(value: tab) {
+                        Label(tab.rawValue, systemImage: tab.icon)
+                            .font(.system(size: 13, weight: .medium))
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
+            
+        } detail: {
+            // MARK: - Detail Content Area
+            VStack(spacing: 0) {
+                // Content View
+                Group {
+                    switch currentTab {
+                    case .overview:
+                        OverviewTab(sortField: $sortField, sortDirection: $sortDirection)
+                    case .models:
+                        ModelsTab(sortField: $sortField, sortDirection: $sortDirection)
+                    case .daily:
+                        DailyTab(sortField: $sortField, sortDirection: $sortDirection)
+                    case .stats:
+                        StatsTab()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Footer (status bar)
-            footerBar
+                // Footer (status bar)
+                footerBar
+            }
+            .background(Color(NSColor.windowBackgroundColor)) // Native macOS background
         }
-        .background(AppColors.background)
         .preferredColorScheme(.dark)
         .task { await store.refreshAll() }
-    }
-
-    // MARK: - Header
-    private var headerBar: some View {
-        HStack(spacing: 0) {
-            Text(" TokenTrack ")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundStyle(store.currentTheme.accent)
-
-            Spacer().frame(width: 12)
-
-            ForEach(DashboardTab.allCases) { tab in
-                Button(action: { currentTab = tab }) {
-                    Text(tab.rawValue)
-                        .font(.system(size: 12, weight: currentTab == tab ? .bold : .regular, design: .monospaced))
-                        .foregroundStyle(currentTab == tab ? store.currentTheme.accent : AppColors.muted)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
+        .toolbar {
+            // Adds a refresh button to the native toolbar
+            ToolbarItem(placement: .automatic) {
+                Button(action: {
+                    Task {
+                        refreshing = true
+                        await store.refreshAll()
+                        refreshing = false
+                    }
+                }) {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                        .symbolEffect(.bounce, value: refreshing)
                 }
-                .buttonStyle(.plain)
-
-                if tab != DashboardTab.allCases.last {
-                    Text("│").foregroundStyle(AppColors.border).font(.system(size: 12, design: .monospaced))
-                }
+                .disabled(refreshing)
             }
-
-            Spacer()
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(AppColors.background)
-        .overlay(alignment: .bottom) { Rectangle().fill(AppColors.border).frame(height: 1) }
     }
 
     // MARK: - Footer
     private var footerBar: some View {
         VStack(spacing: 0) {
-            Rectangle().fill(AppColors.border).frame(height: 1)
+            Divider()
 
-            VStack(spacing: 2) {
+            VStack(spacing: 4) {
                 // Row 1: Sort + Totals
-                HStack {
-                    // Sort buttons
-                    HStack(spacing: 4) {
-                        Text("Sort:").font(.system(size: 11, design: .monospaced)).foregroundStyle(AppColors.muted)
-                        ForEach(SortField.allCases, id: \.self) { field in
-                            Button(action: {
-                                if sortField == field { sortDirection.toggle() } else { sortField = field; sortDirection = .descending }
-                            }) {
-                                Text(field.rawValue)
-                                    .font(.system(size: 11, weight: sortField == field ? .bold : .regular, design: .monospaced))
-                                    .foregroundStyle(sortField == field ? AppColors.foreground : AppColors.muted)
+                HStack(alignment: .center) {
+                    // Sort Buttons Group
+                    HStack(spacing: 8) {
+                        Text("Sort:").font(.system(size: 11)).foregroundStyle(.secondary)
+                        
+                        Picker("", selection: $sortField) {
+                            ForEach(SortField.allCases, id: \.self) { field in
+                                Text(field.rawValue).tag(field)
                             }
-                            .buttonStyle(.plain)
                         }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 160)
+                        
+                        Button(action: { sortDirection.toggle() }) {
+                            Image(systemName: sortDirection == .descending ? "arrow.down" : "arrow.up")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     Spacer()
 
                     // Totals
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Text(Formatting.formatTokens(store.modelReport?.entries.reduce(0) { $0 + $1.totalTokens } ?? 0))
                             .foregroundStyle(.cyan)
-                        Text("tokens").foregroundStyle(AppColors.muted)
-                        Text("|").foregroundStyle(AppColors.muted)
+                            .font(.system(size: 12, design: .monospaced))
+                        Text("tokens").foregroundStyle(.secondary).font(.system(size: 11))
+                        
+                        Text("│").foregroundStyle(.tertiary)
+                        
                         Text(Formatting.formatCost(store.modelReport?.totalCost ?? 0))
-                            .foregroundStyle(.green).fontWeight(.bold)
+                            .foregroundStyle(.green).fontWeight(.semibold)
+                            .font(.system(size: 12, design: .monospaced))
                         Text("(\(store.modelReport?.entries.count ?? 0) models)")
-                            .foregroundStyle(AppColors.muted)
+                            .foregroundStyle(.secondary).font(.system(size: 11))
                     }
-                    .font(.system(size: 11, design: .monospaced))
                 }
 
-                // Row 2: Help
-                HStack {
-                    Text("↑↓ scroll • ←→ view • [p:\(store.currentTheme.name.rawValue)] • [r:refresh] • q")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(AppColors.muted)
-                    Spacer()
-                }
-
-                // Row 3: Status
+                // Row 2: Status
                 HStack {
                     if store.isLoading {
                         HStack(spacing: 4) {
                             ProgressView().controlSize(.mini)
-                            Text("Scanning sources...").foregroundStyle(AppColors.muted)
+                            Text("Scanning sources...").font(.system(size: 11)).foregroundStyle(.secondary)
                         }
                     } else if let last = store.lastRefresh {
-                        Text("Last updated: \(timeAgo(last))").foregroundStyle(AppColors.muted)
+                        Text("Last updated: \(timeAgo(last))")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
+                    
                     Spacer()
+                    
                     Button(action: { store.cycleTheme() }) {
-                        Text("🎨 \(store.currentTheme.name.displayName)")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.purple)
+                        Label(store.currentTheme.name.displayName, systemImage: "paintpalette.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(store.currentTheme.accent)
                     }
                     .buttonStyle(.plain)
-
-                    Button(action: { Task { refreshing = true; await store.refreshAll(); refreshing = false } }) {
-                        Text(refreshing ? "⏳" : "↻ Refresh")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.yellow)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(refreshing)
                 }
-                .font(.system(size: 11, design: .monospaced))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.regularMaterial)
         }
     }
 
