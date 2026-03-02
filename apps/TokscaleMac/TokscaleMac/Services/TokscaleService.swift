@@ -15,12 +15,21 @@ actor TokscaleService {
             var paths: [String] = []
 
             // 1. Resources dir next to source (for SPM dev builds)
-            let execURL = URL(fileURLWithPath: CommandLine.arguments[0])
-            let execDir = execURL.deletingLastPathComponent().path
-            paths.append(execDir + "/../../../TokscaleMac/Resources/tokscale")
-
-            // Also check relative to the binary directly
-            paths.append(execDir + "/tokscale")
+            if let execURL = Bundle.main.executableURL ?? URL(string: CommandLine.arguments[0]) {
+                var searchDir = URL(fileURLWithPath: execURL.path)
+                // Search upwards up to 4 levels to find TokscaleMac/Resources/tokscale
+                for _ in 0..<4 {
+                    searchDir = searchDir.deletingLastPathComponent()
+                    let testPath = searchDir.appendingPathComponent("TokscaleMac/Resources/tokscale").path
+                    if FileManager.default.isExecutableFile(atPath: testPath) {
+                        paths.append(testPath)
+                        break
+                    }
+                }
+                
+                // Also check relative to the binary directly
+                paths.append(execURL.deletingLastPathComponent().appendingPathComponent("tokscale").path)
+            }
 
             // 2. App bundle (when built as .app)
             if let bundlePath = Bundle.main.path(forResource: "tokscale", ofType: nil) {
@@ -43,6 +52,7 @@ actor TokscaleService {
         // Find first executable
         if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
             self.cliBinaryPath = found
+            print("TokscaleService initialized with binary at: \(found)")
         } else {
             // Last resort: try `which`
             let which = Process()
@@ -55,6 +65,7 @@ actor TokscaleService {
             let path = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             self.cliBinaryPath = path.isEmpty ? "tokscale" : path
+            print("TokscaleService fallback configured with path: \(self.cliBinaryPath)")
         }
     }
 
