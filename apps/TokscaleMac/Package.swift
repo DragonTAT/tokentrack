@@ -7,7 +7,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "TokscaleMac",
-            path: "TokscaleMac"
+            path: "TokscaleMac",
+            exclude: ["Resources"]
         )
     ]
 )

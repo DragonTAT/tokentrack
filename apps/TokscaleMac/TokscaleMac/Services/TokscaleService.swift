@@ -1,23 +1,50 @@
 import Foundation
 
-/// Service that calls tokscale CLI binary and parses JSON output.
+/// Service that calls the bundled tokscale CLI binary and parses JSON output.
 actor TokscaleService {
     private let cliBinaryPath: String
 
     init() {
-        // Find the tokscale binary
-        let candidates = [
-            FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Desktop/claude/tokentrack/target/release/tokscale").path,
-            "/usr/local/bin/tokscale",
-            "/opt/homebrew/bin/tokscale",
-        ]
+        // Priority order:
+        // 1. Bundled binary in app's Resources/
+        // 2. Adjacent to the executable (SPM .build/debug layout)
+        // 3. Well-known install paths
+        // 4. `which tokscale` fallback
 
-        // Check which one exists
+        let candidates: [String] = {
+            var paths: [String] = []
+
+            // 1. Resources dir next to source (for SPM dev builds)
+            let execURL = URL(fileURLWithPath: CommandLine.arguments[0])
+            let execDir = execURL.deletingLastPathComponent().path
+            paths.append(execDir + "/../../../TokscaleMac/Resources/tokscale")
+
+            // Also check relative to the binary directly
+            paths.append(execDir + "/tokscale")
+
+            // 2. App bundle (when built as .app)
+            if let bundlePath = Bundle.main.path(forResource: "tokscale", ofType: nil) {
+                paths.append(bundlePath)
+            }
+
+            // 3. Well-known development path
+            paths.append(
+                FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Desktop/claude/tokentrack/target/release/tokscale").path
+            )
+
+            // 4. System paths
+            paths.append("/usr/local/bin/tokscale")
+            paths.append("/opt/homebrew/bin/tokscale")
+
+            return paths
+        }()
+
+        // Find first executable
         if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
             self.cliBinaryPath = found
         } else {
-            // Try to find via `which`
+            // Last resort: try `which`
             let which = Process()
             which.executableURL = URL(fileURLWithPath: "/usr/bin/which")
             which.arguments = ["tokscale"]
@@ -44,7 +71,6 @@ actor TokscaleService {
     }
 
     func fetchGraphData() async throws -> GraphResult {
-        // Graph command writes JSON to a file, not stdout
         let tmpFile = FileManager.default.temporaryDirectory
             .appendingPathComponent("tokscale_graph_\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: tmpFile) }
