@@ -45,8 +45,7 @@ jobs:
             clippy-${{ runner.os }}-cargo-
 
       - name: Run Clippy
-        # tokscale-tauri is macOS-only (requires GTK/WebKit not on ubuntu)
-        run: cargo clippy --workspace --all-features --exclude tokscale-tauri -- -D warnings
+        run: cargo clippy --workspace --all-features -- -D warnings
 
   fmt:
     name: Format Check
@@ -94,12 +93,10 @@ jobs:
         uses: taiki-e/install-action@cargo-tarpaulin
 
       - name: Generate coverage report
-        # tokscale-tauri is macOS-only (requires GTK/WebKit not on ubuntu)
         run: |
           cargo tarpaulin \
             --workspace \
             --all-features \
-            --exclude tokscale-tauri \
             --out Xml \
             --output-dir ./coverage \
             --timeout 300 \
@@ -109,7 +106,6 @@ jobs:
         run: |
           cargo tarpaulin \
             --workspace \
-            --exclude tokscale-tauri \
             --out Json \
             --output-dir ./coverage \
             --timeout 300
