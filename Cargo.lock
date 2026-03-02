@@ -3353,7 +3353,7 @@ dependencies = [
 
 [[package]]
 name = "tokscale-cli"
-version = "3.0.2"
+version = "3.0.3"
 dependencies = [
  "ab_glyph",
  "anyhow",
@@ -3392,7 +3392,7 @@ dependencies = [
 
 [[package]]
 name = "tokscale-core"
-version = "3.0.2"
+version = "3.0.3"
 dependencies = [
  "chrono",
  "dirs",

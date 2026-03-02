@@ -27,6 +27,17 @@ RUST_BIN="$ROOT_DIR/target/release/tokscale"
 SWIFT_BIN="$ROOT_DIR/apps/TokscaleMac/.build/release/${SWIFT_PRODUCT_NAME}"
 
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
+APPLE_TEAM_ID="${APPLE_TEAM_ID:-}"
+ALLOW_UNSIGNED_RELEASE="${ALLOW_UNSIGNED_RELEASE:-true}"
+
+ALLOW_UNSIGNED_RELEASE="$(printf '%s' "$ALLOW_UNSIGNED_RELEASE" | tr '[:upper:]' '[:lower:]')"
+if [[ "$ALLOW_UNSIGNED_RELEASE" != "true" && "$ALLOW_UNSIGNED_RELEASE" != "false" ]]; then
+  echo "Error: ALLOW_UNSIGNED_RELEASE must be true or false"
+  exit 1
+fi
+
+RESOLVED_SIGNING_IDENTITY=""
+SIGNED_ARTIFACTS="false"
 
 tmp_notary_key=""
 cleanup() {
@@ -35,6 +46,56 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+warn() {
+  echo "Warning: $*"
+}
+
+resolve_signing_identity() {
+  local identity_output
+  identity_output="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+
+  if [[ -n "$SIGNING_IDENTITY" ]]; then
+    if printf '%s\n' "$identity_output" | grep -Fq "$SIGNING_IDENTITY"; then
+      RESOLVED_SIGNING_IDENTITY="$SIGNING_IDENTITY"
+      echo "Using SIGNING_IDENTITY from environment: $SIGNING_IDENTITY"
+      return 0
+    fi
+    warn "SIGNING_IDENTITY '$SIGNING_IDENTITY' was not found in keychain. Falling back to auto-discovery."
+  fi
+
+  local selected_hash=""
+  local selected_label=""
+  while IFS= read -r line; do
+    [[ "$line" == *"Developer ID Application:"* ]] || continue
+
+    local hash
+    hash="$(printf '%s\n' "$line" | awk '{print $2}')"
+    local label
+    label="$(printf '%s\n' "$line" | sed -n 's/^[[:space:]]*[0-9][0-9]*[)] [0-9A-F]\{40\} "\(Developer ID Application:.*\)"/\1/p')"
+
+    [[ -n "$hash" && -n "$label" ]] || continue
+
+    if [[ -n "$APPLE_TEAM_ID" && "$label" != *"(${APPLE_TEAM_ID})"* ]]; then
+      continue
+    fi
+
+    selected_hash="$hash"
+    selected_label="$label"
+    break
+  done <<< "$identity_output"
+
+  if [[ -n "$selected_hash" ]]; then
+    RESOLVED_SIGNING_IDENTITY="$selected_hash"
+    echo "Auto-selected signing identity: $selected_label"
+    if [[ -n "$APPLE_TEAM_ID" ]]; then
+      echo "Team filter: $APPLE_TEAM_ID"
+    fi
+    return 0
+  fi
+
+  return 1
+}
 
 echo "[1/6] Build Rust CLI"
 cd "$ROOT_DIR"
@@ -84,12 +145,40 @@ cat > "$APP_BUNDLE_DIR/Contents/Info.plist" <<EOF
 EOF
 
 echo "[4/6] Sign app and binaries"
-if [[ -n "$SIGNING_IDENTITY" ]]; then
-  codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" "$APP_BUNDLE_DIR/Contents/Resources/tokscale"
-  codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" "$APP_BUNDLE_DIR"
-  codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE_DIR"
+if resolve_signing_identity; then
+  set +e
+  codesign --force --timestamp --options runtime --sign "$RESOLVED_SIGNING_IDENTITY" "$APP_BUNDLE_DIR/Contents/Resources/tokscale"
+  sign_cli_status=$?
+  if [[ $sign_cli_status -eq 0 ]]; then
+    codesign --force --timestamp --options runtime --sign "$RESOLVED_SIGNING_IDENTITY" "$APP_BUNDLE_DIR"
+    sign_app_status=$?
+  else
+    sign_app_status=1
+  fi
+  if [[ $sign_cli_status -eq 0 && $sign_app_status -eq 0 ]]; then
+    codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE_DIR"
+    verify_status=$?
+  else
+    verify_status=1
+  fi
+  set -e
+
+  if [[ $sign_cli_status -eq 0 && $sign_app_status -eq 0 && $verify_status -eq 0 ]]; then
+    SIGNED_ARTIFACTS="true"
+    echo "App signing complete."
+  elif [[ "$ALLOW_UNSIGNED_RELEASE" == "true" ]]; then
+    warn "codesign failed. Continuing with unsigned artifacts (Gatekeeper warning expected)."
+  else
+    echo "Error: codesign failed and ALLOW_UNSIGNED_RELEASE=false"
+    exit 1
+  fi
 else
-  echo "SIGNING_IDENTITY is not set. Building unsigned artifacts."
+  if [[ "$ALLOW_UNSIGNED_RELEASE" == "true" ]]; then
+    warn "No usable Developer ID Application identity found. Continuing with unsigned artifacts (Gatekeeper warning expected)."
+  else
+    echo "Error: no usable Developer ID Application identity found and ALLOW_UNSIGNED_RELEASE=false"
+    exit 1
+  fi
 fi
 
 echo "[5/6] Create ZIP and DMG"
@@ -104,8 +193,20 @@ cp -R "$APP_BUNDLE_DIR" "$DMG_STAGING_DIR/"
 ln -s /Applications "$DMG_STAGING_DIR/Applications"
 hdiutil create -volname "${APP_NAME} ${VERSION}" -srcfolder "$DMG_STAGING_DIR" -ov -format UDZO "$DMG_PATH"
 
-if [[ -n "$SIGNING_IDENTITY" ]]; then
-  codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG_PATH"
+if [[ "$SIGNED_ARTIFACTS" == "true" ]]; then
+  set +e
+  codesign --force --timestamp --sign "$RESOLVED_SIGNING_IDENTITY" "$DMG_PATH"
+  sign_dmg_status=$?
+  set -e
+  if [[ $sign_dmg_status -ne 0 ]]; then
+    if [[ "$ALLOW_UNSIGNED_RELEASE" == "true" ]]; then
+      warn "DMG signing failed. Continuing with unsigned DMG (Gatekeeper warning expected)."
+      SIGNED_ARTIFACTS="false"
+    else
+      echo "Error: DMG signing failed and ALLOW_UNSIGNED_RELEASE=false"
+      exit 1
+    fi
+  fi
 fi
 
 echo "[6/6] Notarize and staple (if credentials exist)"
@@ -121,7 +222,7 @@ if [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE
   has_apple_id="true"
 fi
 
-if [[ -n "$SIGNING_IDENTITY" ]]; then
+if [[ "$SIGNED_ARTIFACTS" == "true" ]]; then
   if [[ "$has_api_key" == "true" ]]; then
     tmp_notary_key="$(mktemp "$ROOT_DIR/.notary_key.XXXXXX.p8")"
     if [[ -n "${APPLE_NOTARY_PRIVATE_KEY:-}" ]]; then
@@ -140,7 +241,7 @@ if [[ -n "$SIGNING_IDENTITY" ]]; then
     echo "Notarization skipped. Missing notarization credentials."
   fi
 else
-  echo "Notarization skipped. SIGNING_IDENTITY is not set."
+  echo "Notarization skipped. Artifacts are unsigned."
 fi
 
 echo "Artifacts:"

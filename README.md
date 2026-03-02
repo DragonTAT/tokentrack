@@ -78,6 +78,20 @@ cd /Users/chen/Desktop/claude/tokentrack
 ./target/release/tokscale models --json --no-spinner
 ```
 
+## Release Signing States (macOS)
+
+The macOS release script (`scripts/macos/release_signed_dmg.sh`) supports three artifact states:
+
+1. Signed and notarized: preferred for distribution (best Gatekeeper compatibility).
+2. Signed but not notarized: signature is present, but users may still see warnings depending on system policy.
+3. Unsigned fallback: enabled when signing identity is unavailable and `ALLOW_UNSIGNED_RELEASE=true` (default). Users should expect Gatekeeper warnings and manual override prompts.
+
+Signing selection behavior:
+
+- If `SIGNING_IDENTITY` is set and found in keychain, it is used first.
+- Otherwise, the script auto-selects a `Developer ID Application` identity.
+- If `APPLE_TEAM_ID` is provided, auto-selection is filtered to identities containing that team ID.
+
 
 
 ## Acknowledgment
