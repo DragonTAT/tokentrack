@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "TokenTrack",
-  "version": "1.0.0",
+  "version": "2.3.1",
   "identifier": "com.dragontat.tokentrack",
   "build": {
-    "beforeDevCommand": "cd ../../apps/tauri-ui && npm run dev",
-    "beforeBuildCommand": "cd ../../apps/tauri-ui && npm run build",
+    "beforeDevCommand": { "script": "npm run dev", "cwd": "../../apps/tauri-ui" },
+    "beforeBuildCommand": { "script": "npm run build", "cwd": "../../apps/tauri-ui" },
     "devUrl": "http://localhost:5173",
     "frontendDist": "../../apps/tauri-ui/dist"
   },
@@ -36,13 +36,6 @@
     ],
     "security": {
       "csp": null
-    },
-    "trayIcon": {
-      "id": "main-tray",
-      "iconPath": "icons/tray-icon.png",
-      "iconAsTemplate": true,
-      "menuOnLeftClick": false,
-      "tooltip": "TokenTrack"
     }
   },
   "bundle": {

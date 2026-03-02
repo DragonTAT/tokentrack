@@ -297,6 +297,48 @@ pub fn get_home_dir_string(home_dir_option: &Option<String>) -> Result<String, S
         })
 }
 
+/// Parse files in parallel, apply a cost function to each message, and collect results.
+///
+/// `parser` converts a file path to zero or more unified messages.
+/// `cost_fn` receives each `&UnifiedMessage` (with the parser's original `cost` still set)
+/// and returns the final cost to store.  This lets callers implement fallback logic like
+/// "use calculated cost if > 0, otherwise keep the CSV cost".
+fn parse_and_price<F, C>(
+    paths: &[PathBuf],
+    parser: F,
+    cost_fn: C,
+) -> Vec<UnifiedMessage>
+where
+    F: Fn(&Path) -> Vec<UnifiedMessage> + Sync,
+    C: Fn(&UnifiedMessage) -> f64 + Sync,
+{
+    paths
+        .par_iter()
+        .flat_map(|path| {
+            parser(path)
+                .into_iter()
+                .map(|mut msg| {
+                    msg.cost = cost_fn(&msg);
+                    msg
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Standard pricing: all token types passed through directly.
+#[inline]
+fn standard_cost(msg: &UnifiedMessage, pricing: &pricing::PricingService) -> f64 {
+    pricing.calculate_cost(
+        &msg.model_id,
+        msg.tokens.input,
+        msg.tokens.output,
+        msg.tokens.cache_read,
+        msg.tokens.cache_write,
+        msg.tokens.reasoning,
+    )
+}
+
 fn parse_all_messages_with_pricing(
     home_dir: &str,
     clients: &[String],
@@ -313,14 +355,7 @@ fn parse_all_messages_with_pricing(
             sessions::opencode::parse_opencode_sqlite(db_path)
                 .into_iter()
                 .map(|mut msg| {
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
+                    msg.cost = standard_cost(&msg, pricing);
                     if let Some(ref key) = msg.dedup_key {
                         opencode_seen.insert(key.clone());
                     }
@@ -335,14 +370,7 @@ fn parse_all_messages_with_pricing(
         .par_iter()
         .filter_map(|path| {
             let mut msg = sessions::opencode::parse_opencode_file(path)?;
-            msg.cost = pricing.calculate_cost(
-                &msg.model_id,
-                msg.tokens.input,
-                msg.tokens.output,
-                msg.tokens.cache_read,
-                msg.tokens.cache_write,
-                msg.tokens.reasoning,
-            );
+            msg.cost = standard_cost(&msg, pricing);
             Some(msg)
         })
         .collect();
@@ -352,6 +380,7 @@ fn parse_all_messages_with_pricing(
             .is_none_or(|key| opencode_seen.insert(key.clone()))
     }));
 
+    // Claude requires deduplication by requestId:messageId composite key
     let claude_messages_raw: Vec<(String, UnifiedMessage)> = scan_result
         .get(ClientId::Claude)
         .par_iter()
@@ -359,15 +388,8 @@ fn parse_all_messages_with_pricing(
             sessions::claudecode::parse_claude_file(path)
                 .into_iter()
                 .map(|mut msg| {
-                    let dedup_key = msg.dedup_key.clone().unwrap_or_default();
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
+                    let dedup_key = msg.dedup_key.take().unwrap_or_default();
+                    msg.cost = standard_cost(&msg, pricing);
                     (dedup_key, msg)
                 })
                 .collect::<Vec<_>>()
@@ -382,215 +404,70 @@ fn parse_all_messages_with_pricing(
         .collect();
     all_messages.extend(claude_messages);
 
-    let codex_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::Codex)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::codex::parse_codex_file(path)
-                .into_iter()
-                .map(|mut msg| {
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(codex_messages);
+    // Gemini / Antigravity: merge reasoning into output, zero out cache fields
+    let gemini_cost = |msg: &UnifiedMessage| {
+        pricing.calculate_cost(
+            &msg.model_id,
+            msg.tokens.input,
+            msg.tokens.output + msg.tokens.reasoning,
+            0,
+            0,
+            0,
+        )
+    };
 
-    let gemini_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::Gemini)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::gemini::parse_gemini_file(path)
-                .into_iter()
-                .map(|mut msg| {
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output + msg.tokens.reasoning,
-                        0,
-                        0,
-                        0,
-                    );
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(gemini_messages);
+    // Cursor / Amp: prefer calculated cost; fall back to parser-supplied value when 0
+    let fallback_cost = |msg: &UnifiedMessage| {
+        let original = msg.cost;
+        let calculated = standard_cost(msg, pricing);
+        if calculated > 0.0 { calculated } else { original }
+    };
 
-    let antigravity_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::Antigravity)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::gemini::parse_antigravity_file(path)
-                .into_iter()
-                .map(|mut msg| {
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output + msg.tokens.reasoning,
-                        0,
-                        0,
-                        0,
-                    );
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(antigravity_messages);
-
-    let cursor_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::Cursor)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::cursor::parse_cursor_file(path)
-                .into_iter()
-                .map(|mut msg| {
-                    let csv_cost = msg.cost;
-                    let calculated_cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
-                    msg.cost = if calculated_cost > 0.0 {
-                        calculated_cost
-                    } else {
-                        csv_cost
-                    };
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(cursor_messages);
-
-    let amp_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::Amp)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::amp::parse_amp_file(path)
-                .into_iter()
-                .map(|mut msg| {
-                    let credits = msg.cost;
-                    let calculated_cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
-                    msg.cost = if calculated_cost > 0.0 {
-                        calculated_cost
-                    } else {
-                        credits
-                    };
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(amp_messages);
-
-    let droid_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::Droid)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::droid::parse_droid_file(path)
-                .into_iter()
-                .map(|mut msg| {
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(droid_messages);
-
-    let openclaw_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::OpenClaw)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::openclaw::parse_openclaw_transcript(path)
-                .into_iter()
-                .map(|mut msg| {
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(openclaw_messages);
-
-    let pi_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::Pi)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::pi::parse_pi_file(path)
-                .into_iter()
-                .map(|mut msg| {
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(pi_messages);
-
-    let kimi_messages: Vec<UnifiedMessage> = scan_result
-        .get(ClientId::Kimi)
-        .par_iter()
-        .flat_map(|path| {
-            sessions::kimi::parse_kimi_file(path)
-                .into_iter()
-                .map(|mut msg| {
-                    msg.cost = pricing.calculate_cost(
-                        &msg.model_id,
-                        msg.tokens.input,
-                        msg.tokens.output,
-                        msg.tokens.cache_read,
-                        msg.tokens.cache_write,
-                        msg.tokens.reasoning,
-                    );
-                    msg
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    all_messages.extend(kimi_messages);
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::Codex),
+        sessions::codex::parse_codex_file,
+        |msg| standard_cost(msg, pricing),
+    ));
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::Gemini),
+        sessions::gemini::parse_gemini_file,
+        gemini_cost,
+    ));
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::Antigravity),
+        sessions::gemini::parse_antigravity_file,
+        gemini_cost,
+    ));
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::Cursor),
+        sessions::cursor::parse_cursor_file,
+        fallback_cost,
+    ));
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::Amp),
+        sessions::amp::parse_amp_file,
+        fallback_cost,
+    ));
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::Droid),
+        sessions::droid::parse_droid_file,
+        |msg| standard_cost(msg, pricing),
+    ));
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::OpenClaw),
+        sessions::openclaw::parse_openclaw_transcript,
+        |msg| standard_cost(msg, pricing),
+    ));
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::Pi),
+        sessions::pi::parse_pi_file,
+        |msg| standard_cost(msg, pricing),
+    ));
+    all_messages.extend(parse_and_price(
+        scan_result.get(ClientId::Kimi),
+        sessions::kimi::parse_kimi_file,
+        |msg| standard_cost(msg, pricing),
+    ));
 
     all_messages
 }
@@ -869,8 +746,8 @@ pub fn parse_local_clients(options: LocalParseOptions) -> Result<ParsedMessages,
             let sqlite_msgs: Vec<(String, ParsedMessage)> =
                 sessions::opencode::parse_opencode_sqlite(db_path)
                     .into_iter()
-                    .map(|msg| {
-                        let key = msg.dedup_key.clone().unwrap_or_default();
+                    .map(|mut msg| {
+                        let key = msg.dedup_key.take().unwrap_or_default();
                         (key, unified_to_parsed(&msg))
                     })
                     .collect();
@@ -887,8 +764,8 @@ pub fn parse_local_clients(options: LocalParseOptions) -> Result<ParsedMessages,
             .get(ClientId::OpenCode)
             .par_iter()
             .filter_map(|path| {
-                let msg = sessions::opencode::parse_opencode_file(path)?;
-                let key = msg.dedup_key.clone().unwrap_or_default();
+                let mut msg = sessions::opencode::parse_opencode_file(path)?;
+                let key = msg.dedup_key.take().unwrap_or_default();
                 Some((key, unified_to_parsed(&msg)))
             })
             .collect();
@@ -910,8 +787,8 @@ pub fn parse_local_clients(options: LocalParseOptions) -> Result<ParsedMessages,
         .flat_map(|path| {
             sessions::claudecode::parse_claude_file(path)
                 .into_iter()
-                .map(|msg| {
-                    let dedup_key = msg.dedup_key.clone().unwrap_or_default();
+                .map(|mut msg| {
+                    let dedup_key = msg.dedup_key.take().unwrap_or_default();
                     (dedup_key, unified_to_parsed(&msg))
                 })
                 .collect::<Vec<_>>()

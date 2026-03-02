@@ -45,29 +45,6 @@ fn account_id_from_cursor_cache_path(path: &Path) -> String {
     "unknown".to_string()
 }
 
-/// Provider inference from model name
-fn infer_provider(model: &str) -> &'static str {
-    let lower = model.to_lowercase();
-
-    if lower.contains("claude")
-        || lower.contains("sonnet")
-        || lower.contains("opus")
-        || lower.contains("haiku")
-    {
-        "anthropic"
-    } else if lower.contains("gpt") || lower.contains("o1") || lower.contains("o3") {
-        "openai"
-    } else if lower.contains("gemini") {
-        "google"
-    } else if lower.contains("deepseek") {
-        "deepseek"
-    } else if lower.contains("llama") || lower.contains("mixtral") {
-        "meta"
-    } else {
-        "cursor"
-    }
-}
-
 /// Parse a cost string like "$0.50" or "0.50" to f64
 /// Returns 0.0 for empty strings, NaN values, or invalid formats
 fn parse_cost(cost_str: &str) -> f64 {
@@ -187,7 +164,7 @@ pub fn parse_cursor_file(path: &Path) -> Vec<UnifiedMessage> {
         messages.push(UnifiedMessage::new(
             "cursor",
             model,
-            infer_provider(model),
+            super::utils::infer_provider_with_fallback(model, "cursor"),
             format!("cursor-{}-{}", account_id, date_str),
             timestamp,
             TokenBreakdown {
@@ -271,12 +248,13 @@ mod tests {
 
     #[test]
     fn test_infer_provider() {
-        assert_eq!(infer_provider("claude-3-sonnet"), "anthropic");
-        assert_eq!(infer_provider("gpt-4o"), "openai");
-        assert_eq!(infer_provider("gemini-pro"), "google");
-        assert_eq!(infer_provider("deepseek-coder"), "deepseek");
-        assert_eq!(infer_provider("llama-3"), "meta");
-        assert_eq!(infer_provider("unknown-model"), "cursor");
+        use super::super::utils::infer_provider_with_fallback;
+        assert_eq!(infer_provider_with_fallback("claude-3-sonnet", "cursor"), "anthropic");
+        assert_eq!(infer_provider_with_fallback("gpt-4o", "cursor"), "openai");
+        assert_eq!(infer_provider_with_fallback("gemini-pro", "cursor"), "google");
+        assert_eq!(infer_provider_with_fallback("deepseek-coder", "cursor"), "deepseek");
+        assert_eq!(infer_provider_with_fallback("llama-3", "cursor"), "meta");
+        assert_eq!(infer_provider_with_fallback("unknown-model", "cursor"), "cursor");
     }
 
     #[test]

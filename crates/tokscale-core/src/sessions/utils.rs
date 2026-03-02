@@ -55,3 +55,37 @@ pub(crate) fn file_modified_timestamp_ms(path: &Path) -> i64 {
         .map(|duration| duration.as_millis() as i64)
         .unwrap_or_else(|| chrono::Utc::now().timestamp_millis())
 }
+
+/// Infer the AI provider from a model name string.
+///
+/// Checks well-known model name fragments in priority order.
+/// Returns `fallback` when no fragment matches — callers should pass their
+/// client-specific default (e.g. `"cursor"`, `"anthropic"`, `"unknown"`).
+pub(crate) fn infer_provider_with_fallback(model: &str, fallback: &'static str) -> &'static str {
+    let lower = model.to_lowercase();
+
+    if lower.contains("claude")
+        || lower.contains("anthropic")
+        || lower.contains("opus")
+        || lower.contains("sonnet")
+        || lower.contains("haiku")
+    {
+        "anthropic"
+    } else if lower.contains("gpt")
+        || lower.contains("openai")
+        || lower.contains("o1")
+        || lower.contains("o3")
+    {
+        "openai"
+    } else if lower.contains("gemini") || lower.contains("google") {
+        "google"
+    } else if lower.contains("grok") {
+        "xai"
+    } else if lower.contains("deepseek") {
+        "deepseek"
+    } else if lower.contains("llama") || lower.contains("mixtral") {
+        "meta"
+    } else {
+        fallback
+    }
+}

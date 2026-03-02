@@ -115,10 +115,7 @@ fn parse_gemini_session(
             None => continue,
         };
 
-        let model = match msg.model {
-            Some(m) => m,
-            None => continue,
-        };
+        let model = msg.model.unwrap_or_else(|| "gemini-2.0-flash".to_string());
 
         let timestamp = msg
             .timestamp
@@ -442,6 +439,43 @@ mod tests {
         assert_eq!(messages[0].tokens.output, 25);
         assert_eq!(messages[0].tokens.reasoning, 3);
         assert_eq!(messages[0].client, "gemini");
+    }
+
+    #[test]
+    fn test_parse_gemini_session_missing_model_falls_back_to_flash() {
+        // Gemini/Antigravity sessions sometimes omit the model field;
+        // the parser should default to "gemini-2.0-flash" instead of dropping the record.
+        let json = r#"{
+            "sessionId": "ses_no_model",
+            "projectHash": "abc000",
+            "startTime": "2026-01-01T10:00:00Z",
+            "lastUpdated": "2026-01-01T10:10:00Z",
+            "messages": [
+                {
+                    "id": "msg_1",
+                    "timestamp": "2026-01-01T10:00:00Z",
+                    "type": "gemini",
+                    "content": "response without model field",
+                    "tokens": {
+                        "input": 50,
+                        "output": 100,
+                        "cached": 0,
+                        "thoughts": 0,
+                        "tool": 0,
+                        "total": 150
+                    }
+                }
+            ]
+        }"#;
+
+        let mut bytes = json.as_bytes().to_vec();
+        let session: GeminiSession = simd_json::from_slice(&mut bytes).unwrap();
+
+        let messages = parse_gemini_session(session, "antigravity", 0);
+        assert_eq!(messages.len(), 1, "should not skip messages with missing model");
+        assert_eq!(messages[0].model_id, "gemini-2.0-flash");
+        assert_eq!(messages[0].tokens.input, 50);
+        assert_eq!(messages[0].tokens.output, 100);
     }
 
     #[test]

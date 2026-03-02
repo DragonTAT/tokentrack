@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { DailyContribution } from "../types";
 import { intensityColor, formatCost, formatTokens } from "../utils";
 
@@ -20,45 +20,47 @@ export default function ContribGraph({ contributions }: Props) {
     y: number;
   } | null>(null);
 
-  // Build a map date -> contribution
-  const byDate = new Map(contributions.map((c) => [c.date, c]));
+  const byDate = useMemo(
+    () => new Map(contributions.map((c) => [c.date, c])),
+    [contributions]
+  );
 
-  // Find the start of the grid: go back 52 weeks from today, aligned to Sunday
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // 0=Sun
-  const gridEnd = new Date(today);
-  const gridStart = new Date(gridEnd);
-  gridStart.setDate(gridStart.getDate() - (WEEKS * DAYS - 1 + dayOfWeek));
+  const weeks = useMemo(() => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const gridStart = new Date(today);
+    gridStart.setDate(gridStart.getDate() - (WEEKS * DAYS - 1 + dayOfWeek));
 
-  // Build columns (weeks)
-  const weeks: (DailyContribution | null)[][] = [];
-  let cursor = new Date(gridStart);
-
-  for (let w = 0; w < WEEKS; w++) {
-    const week: (DailyContribution | null)[] = [];
-    for (let d = 0; d < DAYS; d++) {
-      const dateStr = cursor.toISOString().slice(0, 10);
-      week.push(byDate.get(dateStr) ?? null);
-      cursor.setDate(cursor.getDate() + 1);
+    const result: (DailyContribution | null)[][] = [];
+    const cursor = new Date(gridStart);
+    for (let w = 0; w < WEEKS; w++) {
+      const week: (DailyContribution | null)[] = [];
+      for (let d = 0; d < DAYS; d++) {
+        week.push(byDate.get(cursor.toISOString().slice(0, 10)) ?? null);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      result.push(week);
     }
-    weeks.push(week);
-  }
+    return result;
+  }, [byDate]);
 
-  // Month labels
-  const monthLabels: { label: string; col: number }[] = [];
-  let lastMonth = -1;
-  weeks.forEach((week, wi) => {
-    const firstDay = week.find((d) => d !== null);
-    if (!firstDay) return;
-    const m = new Date(firstDay.date).getMonth();
-    if (m !== lastMonth) {
-      monthLabels.push({
-        label: new Date(firstDay.date).toLocaleString("default", { month: "short" }),
-        col: wi,
-      });
-      lastMonth = m;
-    }
-  });
+  const monthLabels = useMemo(() => {
+    const labels: { label: string; col: number }[] = [];
+    let lastMonth = -1;
+    weeks.forEach((week, wi) => {
+      const firstDay = week.find((d) => d !== null);
+      if (!firstDay) return;
+      const m = new Date(firstDay.date).getMonth();
+      if (m !== lastMonth) {
+        labels.push({
+          label: new Date(firstDay.date).toLocaleString("default", { month: "short" }),
+          col: wi,
+        });
+        lastMonth = m;
+      }
+    });
+    return labels;
+  }, [weeks]);
 
   const svgWidth = WEEKS * (CELL + GAP);
   const svgHeight = DAYS * (CELL + GAP) + 20; // 20 for month labels

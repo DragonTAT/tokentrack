@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { MonthlyReport, MonthlyUsage } from "../types";
 import { formatCost } from "../utils";
 
@@ -6,8 +7,11 @@ interface Props {
 }
 
 export default function MonthlyChart({ report }: Props) {
-  const entries = [...report.entries].reverse(); // show newest first at top
-  const maxCost = Math.max(...report.entries.map((e) => e.cost), 0.001);
+  const entries = useMemo(() => [...report.entries].reverse(), [report.entries]);
+  const maxCost = useMemo(
+    () => Math.max(...report.entries.map((e) => e.cost), 0.001),
+    [report.entries]
+  );
 
   return (
     <div className="space-y-4">
