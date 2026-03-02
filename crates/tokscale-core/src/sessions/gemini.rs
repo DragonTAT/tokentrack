@@ -472,7 +472,11 @@ mod tests {
         let session: GeminiSession = simd_json::from_slice(&mut bytes).unwrap();
 
         let messages = parse_gemini_session(session, "antigravity", 0);
-        assert_eq!(messages.len(), 1, "should not skip messages with missing model");
+        assert_eq!(
+            messages.len(),
+            1,
+            "should not skip messages with missing model"
+        );
         assert_eq!(messages[0].model_id, "gemini-2.0-flash");
         assert_eq!(messages[0].tokens.input, 50);
         assert_eq!(messages[0].tokens.output, 100);

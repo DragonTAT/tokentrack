@@ -249,12 +249,24 @@ mod tests {
     #[test]
     fn test_infer_provider() {
         use super::super::utils::infer_provider_with_fallback;
-        assert_eq!(infer_provider_with_fallback("claude-3-sonnet", "cursor"), "anthropic");
+        assert_eq!(
+            infer_provider_with_fallback("claude-3-sonnet", "cursor"),
+            "anthropic"
+        );
         assert_eq!(infer_provider_with_fallback("gpt-4o", "cursor"), "openai");
-        assert_eq!(infer_provider_with_fallback("gemini-pro", "cursor"), "google");
-        assert_eq!(infer_provider_with_fallback("deepseek-coder", "cursor"), "deepseek");
+        assert_eq!(
+            infer_provider_with_fallback("gemini-pro", "cursor"),
+            "google"
+        );
+        assert_eq!(
+            infer_provider_with_fallback("deepseek-coder", "cursor"),
+            "deepseek"
+        );
         assert_eq!(infer_provider_with_fallback("llama-3", "cursor"), "meta");
-        assert_eq!(infer_provider_with_fallback("unknown-model", "cursor"), "cursor");
+        assert_eq!(
+            infer_provider_with_fallback("unknown-model", "cursor"),
+            "cursor"
+        );
     }
 
     #[test]

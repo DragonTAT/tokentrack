@@ -303,11 +303,7 @@ pub fn get_home_dir_string(home_dir_option: &Option<String>) -> Result<String, S
 /// `cost_fn` receives each `&UnifiedMessage` (with the parser's original `cost` still set)
 /// and returns the final cost to store.  This lets callers implement fallback logic like
 /// "use calculated cost if > 0, otherwise keep the CSV cost".
-fn parse_and_price<F, C>(
-    paths: &[PathBuf],
-    parser: F,
-    cost_fn: C,
-) -> Vec<UnifiedMessage>
+fn parse_and_price<F, C>(paths: &[PathBuf], parser: F, cost_fn: C) -> Vec<UnifiedMessage>
 where
     F: Fn(&Path) -> Vec<UnifiedMessage> + Sync,
     C: Fn(&UnifiedMessage) -> f64 + Sync,
@@ -420,7 +416,11 @@ fn parse_all_messages_with_pricing(
     let fallback_cost = |msg: &UnifiedMessage| {
         let original = msg.cost;
         let calculated = standard_cost(msg, pricing);
-        if calculated > 0.0 { calculated } else { original }
+        if calculated > 0.0 {
+            calculated
+        } else {
+            original
+        }
     };
 
     all_messages.extend(parse_and_price(

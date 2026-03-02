@@ -86,7 +86,6 @@ fn normalize_model_name(model: &str) -> String {
     collapsed
 }
 
-
 /// Get default model name based on provider when model field is missing
 fn get_default_model_from_provider(provider: &str) -> String {
     match provider.to_lowercase().as_str() {
@@ -166,7 +165,11 @@ pub fn parse_droid_file(path: &Path) -> Vec<UnifiedMessage> {
 
     // Get model and provider
     let provider = settings.provider_lock.clone().unwrap_or_else(|| {
-        super::utils::infer_provider_with_fallback(settings.model.as_deref().unwrap_or(""), "unknown").to_string()
+        super::utils::infer_provider_with_fallback(
+            settings.model.as_deref().unwrap_or(""),
+            "unknown",
+        )
+        .to_string()
     });
 
     let model = if let Some(m) = settings.model {
@@ -255,16 +258,37 @@ mod tests {
     #[test]
     fn test_get_provider_from_model() {
         use super::super::utils::infer_provider_with_fallback;
-        assert_eq!(infer_provider_with_fallback("claude-3-sonnet", "unknown"), "anthropic");
-        assert_eq!(infer_provider_with_fallback("opus-4", "unknown"), "anthropic");
-        assert_eq!(infer_provider_with_fallback("sonnet-4", "unknown"), "anthropic");
-        assert_eq!(infer_provider_with_fallback("haiku-3", "unknown"), "anthropic");
+        assert_eq!(
+            infer_provider_with_fallback("claude-3-sonnet", "unknown"),
+            "anthropic"
+        );
+        assert_eq!(
+            infer_provider_with_fallback("opus-4", "unknown"),
+            "anthropic"
+        );
+        assert_eq!(
+            infer_provider_with_fallback("sonnet-4", "unknown"),
+            "anthropic"
+        );
+        assert_eq!(
+            infer_provider_with_fallback("haiku-3", "unknown"),
+            "anthropic"
+        );
         assert_eq!(infer_provider_with_fallback("gpt-4o", "unknown"), "openai");
-        assert_eq!(infer_provider_with_fallback("o1-preview", "unknown"), "openai");
+        assert_eq!(
+            infer_provider_with_fallback("o1-preview", "unknown"),
+            "openai"
+        );
         assert_eq!(infer_provider_with_fallback("o3-mini", "unknown"), "openai");
-        assert_eq!(infer_provider_with_fallback("gemini-pro", "unknown"), "google");
+        assert_eq!(
+            infer_provider_with_fallback("gemini-pro", "unknown"),
+            "google"
+        );
         assert_eq!(infer_provider_with_fallback("grok-2", "unknown"), "xai");
-        assert_eq!(infer_provider_with_fallback("unknown-model", "unknown"), "unknown");
+        assert_eq!(
+            infer_provider_with_fallback("unknown-model", "unknown"),
+            "unknown"
+        );
     }
 
     #[test]
