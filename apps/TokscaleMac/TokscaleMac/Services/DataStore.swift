@@ -24,6 +24,9 @@ final class DataStore {
     private var refreshTimer: Timer?
 
     init() {
+        Task { @MainActor in
+            await refreshAll()
+        }
         startAutoRefresh()
     }
 
@@ -38,7 +41,7 @@ final class DataStore {
         // Load models
         do {
             self.modelReport = try await service.fetchModelReport()
-            self.totalSessions = modelReport?.entries.reduce(0) { $0 + $1.messageCount } ?? 0
+            self.totalSessions = Int64(modelReport?.entries.reduce(Int32(0)) { $0 + $1.messageCount } ?? 0)
         } catch {
             errors.append("models: \(error.localizedDescription)")
         }

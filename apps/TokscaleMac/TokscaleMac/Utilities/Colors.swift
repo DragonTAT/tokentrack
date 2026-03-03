@@ -75,7 +75,6 @@ enum AppColors {
         switch client.lowercased() {
         case "claude": return "Claude Code"
         case "gemini": return "Gemini CLI"
-        case "antigravity": return "Antigravity"
         case "codex": return "Codex CLI"
         case "opencode": return "OpenCode"
         case "cursor": return "Cursor"

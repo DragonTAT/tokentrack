@@ -8,7 +8,10 @@ let package = Package(
         .executableTarget(
             name: "TokscaleMac",
             path: "TokscaleMac",
-            exclude: ["Resources"]
+            exclude: ["Resources"],
+            resources: [
+                .process("Engine/Pricing/builtin.json")
+            ]
         )
     ]
 )
