@@ -72,16 +72,15 @@ public class ClaudeParser: SessionParser {
                         }
                     }
                     
-                    let rawInput = usage.input_tokens ?? 0
+                    let baseInput = usage.input_tokens ?? 0
                     let cacheRead = usage.cache_read_input_tokens ?? 0
                     let cacheWrite = usage.cache_creation_input_tokens ?? 0
                     
-                    // Anthropic's input_tokens already EXCLUDES cacheRead but INCLUDES cacheWrite.
-                    // To follow our standard where 'input' field is only tokens charged at base rate:
-                    let baseInput = max(0, rawInput - cacheWrite)
+                    // In Claude Code's internal telemetry logs, input_tokens already EXCLUDES both cacheRead and cacheWrite.
+                    // (Unlike the standard Anthropic Messages API where it includes cacheWrite).
                     
                     let breakdown = TokenBreakdown(
-                        input: baseInput,
+                        input: max(0, baseInput),
                         output: max(0, usage.output_tokens ?? 0),
                         cacheRead: max(0, cacheRead),
                         cacheWrite: max(0, cacheWrite),
