@@ -83,6 +83,8 @@ public class Scanner {
                 matches = fileName == "sessions.json"
             case "wire.jsonl":
                 matches = fileName == "wire.jsonl"
+            case "state.vscdb":
+                matches = fileName == "state.vscdb"
             default:
                 matches = false
             }

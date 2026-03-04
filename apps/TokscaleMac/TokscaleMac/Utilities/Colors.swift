@@ -44,6 +44,8 @@ enum AppColors {
         case "deepseek": return Color(red: 6/255, green: 182/255, blue: 212/255)
         case "xai": return Color(red: 234/255, green: 179/255, blue: 8/255)
         case "meta": return Color(red: 99/255, green: 102/255, blue: 241/255)
+        case "moonshot": return Color(red: 245/255, green: 158/255, blue: 11/255)
+        case "minimax": return Color(red: 244/255, green: 114/255, blue: 182/255)
         default: return Color.white
         }
     }
@@ -64,6 +66,10 @@ enum AppColors {
             return "xai"
         } else if m.contains("llama") {
             return "meta"
+        } else if m.contains("kimi") || m.contains("moonshot") {
+            return "moonshot"
+        } else if m.contains("minimax") {
+            return "minimax"
         } else if m == "auto" || m.contains("cursor") {
             return "cursor"
         }
@@ -97,6 +103,8 @@ enum AppColors {
         case "deepseek": return "DeepSeek"
         case "xai": return "xAI"
         case "meta": return "Meta"
+        case "moonshot": return "Moonshot"
+        case "minimax": return "MiniMax"
         case "mistral": return "Mistral"
         case "cohere": return "Cohere"
         case "opencode": return "OpenCode"
