@@ -9,151 +9,93 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            binary_name: tokscale
-            archive_name: Tokentrack-cli-macos-arm64.tar.gz
-
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            binary_name: tokscale
-            archive_name: Tokentrack-cli-macos-x86_64.tar.gz
-
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            binary_name: tokscale
-            archive_name: Tokentrack-cli-linux-x86_64.tar.gz
-
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            binary_name: tokscale
-            archive_name: Tokentrack-cli-linux-arm64.tar.gz
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install cross-compilation tools (Linux ARM64)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }} -p tokscale-cli
-
-      - name: Package
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar -czf ../../../${{ matrix.archive_name }} ${{ matrix.binary_name }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.archive_name }}
-          path: ${{ matrix.archive_name }}
-
-  macos_app:
-    name: Build macOS App (DMG)
+  build-macos-app:
+    name: Build macOS App
     runs-on: macos-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: macos-app-${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: Resolve release version
         id: version
         run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Import Apple signing certificate
-        env:
-          APPLE_SIGNING_CERT_P12_BASE64: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
-          APPLE_SIGNING_CERT_PASSWORD: ${{ secrets.APPLE_SIGNING_CERT_PASSWORD }}
-          APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+      - name: Build (release)
+        working-directory: apps/TokscaleMac
+        run: swift build -c release
+
+      - name: Create app bundle
         run: |
-          if [ -z "$APPLE_SIGNING_CERT_P12_BASE64" ] || [ -z "$APPLE_SIGNING_CERT_PASSWORD" ]; then
-            echo "Signing certificate secrets are not configured. Skipping certificate import."
-            exit 0
+          APP_NAME="TokenTrack"
+          VERSION="${{ steps.version.outputs.value }}"
+          BUILD_DIR="apps/TokscaleMac/.build/release"
+          BUNDLE_DIR="dist/${APP_NAME}.app"
+
+          mkdir -p dist
+          mkdir -p "${BUNDLE_DIR}/Contents/MacOS"
+          mkdir -p "${BUNDLE_DIR}/Contents/Resources"
+
+          cp "${BUILD_DIR}/TokscaleMac" "${BUNDLE_DIR}/Contents/MacOS/${APP_NAME}"
+
+          # Copy resources if they exist
+          if [ -d "apps/TokscaleMac/TokscaleMac/Resources" ]; then
+            cp -r apps/TokscaleMac/TokscaleMac/Resources/. "${BUNDLE_DIR}/Contents/Resources/"
           fi
 
-          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-          CERT_PATH="$RUNNER_TEMP/apple-signing-cert.p12"
-          KEYCHAIN_PASSWORD="$APPLE_KEYCHAIN_PASSWORD"
-          if [ -z "$KEYCHAIN_PASSWORD" ]; then
-            KEYCHAIN_PASSWORD="$(uuidgen)"
-          fi
+          # Copy builtin.json into Resources
+          cp apps/TokscaleMac/TokscaleMac/Engine/Pricing/builtin.json "${BUNDLE_DIR}/Contents/Resources/"
 
-          echo "$APPLE_SIGNING_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          # Write Info.plist
+          cat > "${BUNDLE_DIR}/Contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>${APP_NAME}</string>
+            <key>CFBundleIdentifier</key><string>com.dragontat.tokentrack</string>
+            <key>CFBundleVersion</key><string>${VERSION}</string>
+            <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+            <key>CFBundleExecutable</key><string>${APP_NAME}</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>LSMinimumSystemVersion</key><string>14.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          EOF
 
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_SIGNING_CERT_PASSWORD" -A -T /usr/bin/codesign -T /usr/bin/security
-          security list-keychains -d user -s "$KEYCHAIN_PATH"
-          security default-keychain -d user -s "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security find-identity -v -p codesigning
+          echo "App bundle created at ${BUNDLE_DIR}"
 
-      - name: Build signed/notarized macOS artifacts
-        env:
-          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          ALLOW_UNSIGNED_RELEASE: "true"
-          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
-          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
-          APPLE_NOTARY_PRIVATE_KEY: ${{ secrets.APPLE_NOTARY_PRIVATE_KEY }}
-          APPLE_NOTARY_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_NOTARY_PRIVATE_KEY_BASE64 }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: ./scripts/macos/release_signed_dmg.sh "${{ steps.version.outputs.value }}"
+      - name: Create DMG
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          DMG_NAME="TokenTrack-v${VERSION}-macos-arm64.dmg"
 
-      - name: Upload macOS app artifacts
+          hdiutil create \
+            -volname "TokenTrack" \
+            -srcfolder dist/TokenTrack.app \
+            -ov -format UDZO \
+            "dist/${DMG_NAME}"
+
+          echo "DMG created: dist/${DMG_NAME}"
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Tokentrack-macos-app
-          path: |
-            dist/Tokentrack-v${{ steps.version.outputs.value }}-macos-arm64.dmg
-            dist/Tokentrack-v${{ steps.version.outputs.value }}-macos-arm64.zip
+          name: TokenTrack-macos-app
+          path: dist/
           if-no-files-found: error
 
-  release:
-    name: Create Release
-    needs: [build, macos_app]
+  create-release:
+    name: Create GitHub Release
+    needs: [build-macos-app]
     runs-on: ubuntu-latest
+
     steps:
-      - name: Download all artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
@@ -162,7 +104,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            *.tar.gz
             *.dmg
             *.zip
-          generate_release_notes: true
