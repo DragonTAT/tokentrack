@@ -17,8 +17,8 @@ public class LiteLLM {
     }
     
     public static func loadBuiltin() -> PricingDataset? {
-        guard let url = Bundle.module.url(forResource: "builtin", withExtension: "json") else {
-            print("[tokscale] Warning: builtin.json not found in Bundle.module")
+        guard let url = Bundle.main.url(forResource: "builtin", withExtension: "json") else {
+            print("[tokscale] Warning: builtin.json not found in Bundle.main")
             return nil
         }
         guard let data = try? Data(contentsOf: url) else {
