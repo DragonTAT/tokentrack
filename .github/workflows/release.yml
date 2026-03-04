@@ -40,8 +40,11 @@ jobs:
             exit 1
           fi
 
-          BEST_APP=""
-          BEST_SDK_VER=""
+          EXACT_APP=""
+          EXACT_SDK_VER=""
+          FALLBACK_APP=""
+          FALLBACK_XCODE_VER=""
+          FALLBACK_SDK_VER=""
 
           echo "Detected Xcode candidates:"
           for app in "${CANDIDATES[@]}"; do
@@ -59,27 +62,48 @@ jobs:
 
             echo "  - $(basename "$app"): Xcode $xcode_ver, macOS SDK $sdk_ver"
 
+            if ! version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
+              continue
+            fi
+
             if [ "$xcode_ver" = "$REQUIRED_XCODE" ]; then
-              if version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
-                BEST_APP="$app"
-                BEST_SDK_VER="$sdk_ver"
-                break
-              fi
+              EXACT_APP="$app"
+              EXACT_SDK_VER="$sdk_ver"
+              continue
+            fi
+
+            if [ -z "$FALLBACK_APP" ] || version_ge "$xcode_ver" "$FALLBACK_XCODE_VER"; then
+              FALLBACK_APP="$app"
+              FALLBACK_XCODE_VER="$xcode_ver"
+              FALLBACK_SDK_VER="$sdk_ver"
             fi
           done
 
-          if [ -z "$BEST_APP" ]; then
-            echo "::error::Required Xcode $REQUIRED_XCODE with macOS SDK >= $REQUIRED_MACOS_SDK not found on runner."
+          SELECTED_APP=""
+          SELECTED_XCODE_VER=""
+          SELECTED_SDK_VER=""
+
+          if [ -n "$EXACT_APP" ]; then
+            SELECTED_APP="$EXACT_APP"
+            SELECTED_XCODE_VER="$REQUIRED_XCODE"
+            SELECTED_SDK_VER="$EXACT_SDK_VER"
+          elif [ -n "$FALLBACK_APP" ]; then
+            SELECTED_APP="$FALLBACK_APP"
+            SELECTED_XCODE_VER="$FALLBACK_XCODE_VER"
+            SELECTED_SDK_VER="$FALLBACK_SDK_VER"
+            echo "::warning::Required Xcode $REQUIRED_XCODE not found. Falling back to Xcode $SELECTED_XCODE_VER with macOS SDK $SELECTED_SDK_VER."
+          else
+            echo "::error::No Xcode with macOS SDK >= $REQUIRED_MACOS_SDK found on runner."
             exit 1
           fi
 
-          BEST_DEV_DIR="$BEST_APP/Contents/Developer"
-          echo "Selected Xcode: $(basename "$BEST_APP") (Xcode $REQUIRED_XCODE, macOS SDK $BEST_SDK_VER)"
+          BEST_DEV_DIR="$SELECTED_APP/Contents/Developer"
+          echo "Selected Xcode: $(basename "$SELECTED_APP") (Xcode $SELECTED_XCODE_VER, macOS SDK $SELECTED_SDK_VER)"
 
           echo "DEVELOPER_DIR=$BEST_DEV_DIR" >> "$GITHUB_ENV"
-          echo "xcode_app=$BEST_APP" >> "$GITHUB_OUTPUT"
-          echo "xcode_version=$REQUIRED_XCODE" >> "$GITHUB_OUTPUT"
-          echo "sdk_version=$BEST_SDK_VER" >> "$GITHUB_OUTPUT"
+          echo "xcode_app=$SELECTED_APP" >> "$GITHUB_OUTPUT"
+          echo "xcode_version=$SELECTED_XCODE_VER" >> "$GITHUB_OUTPUT"
+          echo "sdk_version=$SELECTED_SDK_VER" >> "$GITHUB_OUTPUT"
 
       - name: Build environment fingerprint
         shell: bash
