@@ -213,7 +213,7 @@ struct ModelsTab: View {
             switch sortField {
             case .cost: result = a.cost > b.cost
             case .tokens: result = a.totalTokens > b.totalTokens
-            case .date: result = a.cost > b.cost
+            case .date: result = a.cost > b.cost // ModelUsage lacks date; fallback to cost
             }
             return sortDirection == .descending ? result : !result
         }

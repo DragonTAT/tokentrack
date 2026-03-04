@@ -49,7 +49,7 @@ struct Theme {
         case .vscode: // Default
             // Light: Blue accent, clean grays / Dark: Blue accent, deep gray-blue
             colors = [
-                Color(red: 22/255, green: 27/255, blue: 34/255),
+                isDark ? Color(red: 22/255, green: 27/255, blue: 34/255) : Color(red: 235/255, green: 237/255, blue: 240/255),
                 Color(red: 121/255, green: 184/255, blue: 255/255),
                 Color(red: 56/255, green: 139/255, blue: 253/255),
                 Color(red: 31/255, green: 111/255, blue: 235/255),
@@ -60,7 +60,7 @@ struct Theme {
         case .xcode: // Midnight
             // Xcode default colors. Light: true blue. Dark: light cyan/pinkish blue
             colors = [
-                Color(red: 22/255, green: 27/255, blue: 34/255),
+                isDark ? Color(red: 22/255, green: 27/255, blue: 34/255) : Color(red: 235/255, green: 237/255, blue: 240/255),
                 Color(red: 161/255, green: 218/255, blue: 220/255),
                 Color(red: 84/255, green: 191/255, blue: 200/255),
                 Color(red: 23/255, green: 140/255, blue: 180/255),
@@ -71,7 +71,7 @@ struct Theme {
         case .claude: // Claude Code
             // Light: warm beige/biscuit / Dark: earthy brown-grey. Accent: Terracotta/Claude orange
             colors = [
-                Color(red: 22/255, green: 27/255, blue: 34/255),
+                isDark ? Color(red: 22/255, green: 27/255, blue: 34/255) : Color(red: 235/255, green: 237/255, blue: 240/255),
                 Color(red: 245/255, green: 200/255, blue: 160/255),
                 Color(red: 225/255, green: 150/255, blue: 90/255),
                 Color(red: 213/255, green: 105/255, blue: 60/255),
@@ -82,7 +82,7 @@ struct Theme {
         case .nord: // Nord (Cold)
             // Frosty blue/cyan
             colors = [
-                Color(red: 22/255, green: 27/255, blue: 34/255),
+                isDark ? Color(red: 22/255, green: 27/255, blue: 34/255) : Color(red: 235/255, green: 237/255, blue: 240/255),
                 Color(red: 143/255, green: 188/255, blue: 187/255), // Nord 7
                 Color(red: 136/255, green: 192/255, blue: 208/255), // Nord 8
                 Color(red: 129/255, green: 161/255, blue: 193/255), // Nord 9
@@ -93,7 +93,7 @@ struct Theme {
         case .dracula: // Dracula (Purple Night)
             // Hot pink/purple
             colors = [
-                Color(red: 40/255, green: 42/255, blue: 54/255),
+                isDark ? Color(red: 40/255, green: 42/255, blue: 54/255) : Color(red: 235/255, green: 237/255, blue: 240/255),
                 Color(red: 255/255, green: 184/255, blue: 210/255),
                 Color(red: 255/255, green: 121/255, blue: 198/255),
                 Color(red: 189/255, green: 147/255, blue: 249/255),

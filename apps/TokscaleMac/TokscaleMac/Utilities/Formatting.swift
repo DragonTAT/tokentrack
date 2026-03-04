@@ -32,4 +32,11 @@ enum Formatting {
         formatter.groupingSeparator = ","
         return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
     }
+
+    static func timeAgo(_ date: Date) -> String {
+        let s = Int(Date().timeIntervalSince(date))
+        if s < 60 { return "\(s)s ago" }
+        if s < 3600 { return "\(s / 60)m ago" }
+        return "\(s / 3600)h ago"
+    }
 }

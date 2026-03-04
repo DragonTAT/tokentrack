@@ -90,14 +90,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        // Pop the menu at the current mouse location
-        guard let statusBarItem = NSApp.windows.first(where: { $0.title.contains("NSStatusBarWindow") }) else {
-            // Fallback: just pop at mouse position
+        // Pop the menu at the current mouse location (reliable across macOS versions)
+        if let event = NSApp.currentEvent {
+            NSMenu.popUpContextMenu(menu, with: event, for: event.window?.contentView ?? NSView())
+        } else {
             menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-            return
         }
-        let loc = statusBarItem.convertPoint(fromScreen: NSEvent.mouseLocation)
-        menu.popUp(positioning: nil, at: loc, in: statusBarItem.contentView)
     }
 
     @objc private func openSettings() {

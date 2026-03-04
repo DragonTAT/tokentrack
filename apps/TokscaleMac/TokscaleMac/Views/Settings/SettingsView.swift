@@ -146,7 +146,7 @@ struct SettingsView: View {
 
         return Button(action: {
             withAnimation(.easeInOut(duration: 0.2)) {
-                store.setTheme(themeParam)
+                AppSettings.shared.themeName = themeParam
             }
         }) {
             VStack(spacing: 6) {

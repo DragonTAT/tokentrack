@@ -42,7 +42,7 @@ enum AppColors {
         case "meta": return Color(red: 99/255, green: 102/255, blue: 241/255)
         case "moonshot": return Color(red: 245/255, green: 158/255, blue: 11/255)
         case "minimax": return Color(red: 244/255, green: 114/255, blue: 182/255)
-        default: return Color.white
+        default: return Color.primary
         }
     }
 

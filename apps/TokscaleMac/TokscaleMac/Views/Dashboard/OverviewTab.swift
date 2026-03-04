@@ -137,6 +137,8 @@ struct OverviewTab: View {
                                 Text(Formatting.formatTokens(model.tokens.cacheRead)).foregroundStyle(theme.foreground)
                                 Text(" · CW: ").foregroundStyle(theme.secondaryForeground)
                                 Text(Formatting.formatTokens(model.tokens.cacheWrite)).foregroundStyle(theme.foreground)
+                                Text(" · RS: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.tokens.reasoning)).foregroundStyle(theme.foreground)
                                 Spacer()
                             }
                             .font(.system(size: 11, design: .monospaced))
@@ -200,6 +202,8 @@ struct OverviewTab: View {
                                 Text(Formatting.formatTokens(model.cacheRead)).foregroundStyle(theme.foreground)
                                 Text(" · CW: ").foregroundStyle(theme.secondaryForeground)
                                 Text(Formatting.formatTokens(model.cacheWrite)).foregroundStyle(theme.foreground)
+                                Text(" · RS: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.reasoning)).foregroundStyle(theme.foreground)
                                 Spacer()
                             }
                             .font(.system(size: 11, design: .monospaced))
@@ -232,7 +236,7 @@ struct OverviewTab: View {
             switch sortField {
             case .cost: result = a.cost > b.cost
             case .tokens: result = a.totalTokens > b.totalTokens
-            case .date: result = a.cost > b.cost
+            case .date: result = a.cost > b.cost // ModelUsage lacks date; fallback to cost
             }
             return sortDirection == .descending ? result : !result
         }

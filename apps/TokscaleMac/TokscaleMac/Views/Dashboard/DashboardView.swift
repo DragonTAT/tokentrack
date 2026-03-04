@@ -82,7 +82,6 @@ struct DashboardView: View {
             .foregroundStyle(theme.foreground) // Added foreground style as a fallback for the detail view
         }
         // Remove forced dark mode and rely on injected environment
-        .task { await store.refreshAll() }
         .toolbar {
             // Adds a refresh button to the native toolbar
             ToolbarItem(placement: .automatic) {
@@ -158,14 +157,16 @@ struct DashboardView: View {
                             Text("Scanning sources...").font(.system(size: 11)).foregroundStyle(.secondary)
                         }
                     } else if let last = store.lastRefresh {
-                        Text("Last updated: \(timeAgo(last))")
+                        Text("Last updated: \(Formatting.timeAgo(last))")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
                     
                     Spacer()
                     
-                    Button(action: { store.cycleTheme() }) {
+                    Button(action: {
+                        AppSettings.shared.themeName = AppSettings.shared.themeName.next
+                    }) {
                         Label(theme.name.displayName, systemImage: "paintpalette.fill")
                             .font(.system(size: 11))
                             .foregroundStyle(theme.accent)
@@ -179,10 +180,4 @@ struct DashboardView: View {
         }
     }
 
-    private func timeAgo(_ date: Date) -> String {
-        let seconds = Int(Date().timeIntervalSince(date))
-        if seconds < 60 { return "\(seconds)s ago" }
-        if seconds < 3600 { return "\(seconds / 60)m ago" }
-        return "\(seconds / 3600)h ago"
-    }
 }

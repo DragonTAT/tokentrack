@@ -62,7 +62,7 @@ struct ContribGraphView: View {
                         let isSelected = selectedCell?.week == wi && selectedCell?.day == di
 
                         if let day = dayOpt {
-                            let color = store.currentTheme.intensityColor(day.intensity)
+                            let color = theme.intensityColor(day.intensity)
                             if isSelected {
                                 context.fill(RoundedRectangle(cornerRadius: 2).path(in: rect), with: .color(theme.foreground))
                                 let inner = rect.insetBy(dx: 1, dy: 1)
@@ -70,9 +70,13 @@ struct ContribGraphView: View {
                             } else {
                                 context.fill(RoundedRectangle(cornerRadius: 2).path(in: rect), with: .color(color))
                             }
-                            // Empty cell (dot)
-                            let dotRect = CGRect(x: x + cellWidth/2 - 1, y: y + cellWidth/2 - 1, width: 2, height: 2)
-                            context.fill(Circle().path(in: dotRect), with: .color(theme.border))
+                            // Empty cell (dot) - only draw if not pure empty to avoid weird artifacts, or simply don't draw dots for 0 intensity.
+                            if day.intensity == 0 {
+                                // Draw nothing extra for empty cells
+                            } else {
+                                let dotRect = CGRect(x: x + cellWidth/2 - 1, y: y + cellWidth/2 - 1, width: 2, height: 2)
+                                context.fill(Circle().path(in: dotRect), with: .color(theme.border))
+                            }
                         }
                     }
                 }

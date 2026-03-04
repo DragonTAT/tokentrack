@@ -5,7 +5,7 @@ import SwiftUI
 @Observable
 final class DataStore {
     var modelReport: ModelReport?
-    var monthlyReport: MonthlyReport?
+    var monthlyReport: MonthlyReport?  // Reserved for future Monthly view
     var graphResult: GraphResult?
     var todaySummary: TodaySummary?
     var graphGrid: GraphGrid?
@@ -13,8 +13,6 @@ final class DataStore {
     var isLoading = false
     var error: String?
     var lastRefresh: Date?
-
-    var currentTheme: Theme = .from(AppSettings.shared.themeName)
 
     // Stats derived from graph
     var currentStreak: Int = 0
@@ -33,57 +31,46 @@ final class DataStore {
 
     // MARK: - Data Loading (resilient - each command independent)
 
+    // Cached DateFormatter to avoid repeated allocations on hot paths.
+    // @ObservationIgnored prevents the @Observable macro from wrapping this property.
+    @ObservationIgnored
+    private var dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = AppSettings.shared.calendar.timeZone
+        return f
+    }()
+
+    /// Refreshes the formatter when timezone preference changes.
+    private func refreshDateFormatter() {
+        dateFormatter.timeZone = AppSettings.shared.calendar.timeZone
+    }
+
     @MainActor
     func refreshAll() async {
         isLoading = true
         error = nil
-        var errors: [String] = []
+        refreshDateFormatter()
 
-        // Load models
         do {
-            self.modelReport = try await service.fetchModelReport()
-            self.totalSessions = Int64(modelReport?.entries.reduce(Int32(0)) { $0 + $1.messageCount } ?? 0)
+            let snapshot = try await service.fetchAll()
+            self.modelReport = snapshot.modelReport
+            self.monthlyReport = snapshot.monthlyReport
+            self.graphResult = snapshot.graphResult
+            self.totalSessions = Int64(snapshot.modelReport.entries.reduce(Int32(0)) { $0 + $1.messageCount })
+            self.todaySummary = computeTodaySummary(from: snapshot.graphResult)
+            self.graphGrid = buildGraphGrid(from: snapshot.graphResult)
+            computeStreaks(from: snapshot.graphResult)
         } catch {
-            errors.append("models: \(error.localizedDescription)")
-        }
-
-        // Load monthly
-        do {
-            self.monthlyReport = try await service.fetchMonthlyReport()
-        } catch {
-            errors.append("monthly: \(error.localizedDescription)")
-        }
-
-        // Load graph
-        do {
-            let g = try await service.fetchGraphData()
-            self.graphResult = g
-            self.todaySummary = computeTodaySummary(from: g)
-            self.graphGrid = buildGraphGrid(from: g)
-            computeStreaks(from: g)
-        } catch {
-            errors.append("graph: \(error.localizedDescription)")
-        }
-
-        if !errors.isEmpty && modelReport == nil && graphResult == nil {
-            self.error = errors.joined(separator: "\n")
+            self.error = error.localizedDescription
         }
 
         self.lastRefresh = Date()
         isLoading = false
     }
 
-    // MARK: - Theme
-
-    func cycleTheme() {
-        AppSettings.shared.themeName = AppSettings.shared.themeName.next
-        currentTheme = .from(AppSettings.shared.themeName)
-    }
-
-    func setTheme(_ name: ThemeName) {
-        AppSettings.shared.themeName = name
-        currentTheme = .from(name)
-    }
+    // Theme management moved to AppSettings + SwiftUI environment.
+    // Use AppSettings.shared.themeName directly.
 
     // MARK: - Period Summary (today / week / month)
 
@@ -154,10 +141,6 @@ final class DataStore {
     // MARK: - 52-Week Graph Grid
 
     private func buildGraphGrid(from graph: GraphResult) -> GraphGrid {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = AppSettings.shared.calendar.timeZone
-
         let byDate: [String: DailyContribution] = Dictionary(
             graph.contributions.map { ($0.date, $0) },
             uniquingKeysWith: { _, last in last }
@@ -181,7 +164,7 @@ final class DataStore {
         for _ in 0..<53 {
             var week: [GraphDay?] = []
             for _ in 0..<7 {
-                let dateStr = formatter.string(from: cursor)
+                let dateStr = dateFormatter.string(from: cursor)
                 if cursor > today {
                     week.append(nil)
                 } else if let contrib = byDate[dateStr] {
@@ -207,14 +190,11 @@ final class DataStore {
     // MARK: - Streaks
 
     private func computeStreaks(from graph: GraphResult) {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = AppSettings.shared.calendar.timeZone
 
         let activeDates = Set(
             graph.contributions
                 .filter { $0.totals.tokens > 0 }
-                .compactMap { formatter.date(from: $0.date) }
+                .compactMap { dateFormatter.date(from: $0.date) }
         )
 
         let calendar = AppSettings.shared.calendar
@@ -222,6 +202,7 @@ final class DataStore {
         // Current streak (count backwards from today)
         var current = 0
         var checkDate = Date()
+        let formatter = dateFormatter
         while true {
             let dateStr = formatter.string(from: checkDate)
             if let d = formatter.date(from: dateStr), activeDates.contains(d) {

@@ -88,13 +88,15 @@ public struct LocalParseOptions {
     public var since: String?
     public var until: String?
     public var year: String?
+    public var timeZone: TimeZone?
     
-    public init(homeDir: String? = nil, clients: [String]? = nil, since: String? = nil, until: String? = nil, year: String? = nil) {
+    public init(homeDir: String? = nil, clients: [String]? = nil, since: String? = nil, until: String? = nil, year: String? = nil, timeZone: TimeZone? = nil) {
         self.homeDir = homeDir
         self.clients = clients
         self.since = since
         self.until = until
         self.year = year
+        self.timeZone = timeZone
     }
 }
 
@@ -105,14 +107,16 @@ public struct ReportOptions {
     public var until: String?
     public var year: String?
     public var groupBy: GroupBy
+    public var timeZone: TimeZone?
     
-    public init(homeDir: String? = nil, clients: [String]? = nil, since: String? = nil, until: String? = nil, year: String? = nil, groupBy: GroupBy = .clientModel) {
+    public init(homeDir: String? = nil, clients: [String]? = nil, since: String? = nil, until: String? = nil, year: String? = nil, groupBy: GroupBy = .clientModel, timeZone: TimeZone? = nil) {
         self.homeDir = homeDir
         self.clients = clients
         self.since = since
         self.until = until
         self.year = year
         self.groupBy = groupBy
+        self.timeZone = timeZone
     }
 }
 
@@ -143,6 +147,7 @@ public struct MonthlyUsage: Codable, Equatable, Identifiable {
     public var output: Int64
     public var cacheRead: Int64
     public var cacheWrite: Int64
+    public var reasoning: Int64
     public var messageCount: Int32
     public var cost: Double
 }

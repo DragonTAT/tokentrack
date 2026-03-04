@@ -60,7 +60,7 @@ struct PopoverView: View {
                     Text("Total Tokens")
                         .font(.system(size: 10))
                         .foregroundStyle(theme.secondaryForeground)
-                    Text(formatLargeNumber(summary.totalTokens))
+                    Text(Formatting.formatTokens(summary.totalTokens))
                         .font(.system(size: 24, weight: .bold)) // Reduced from 28
                         .foregroundStyle(theme.foreground)
                 }
@@ -103,7 +103,7 @@ struct PopoverView: View {
                                 
                                 Spacer(minLength: 4)
                                 
-                                Text(formatLargeNumber(c.tokens))
+                                Text(Formatting.formatTokens(c.tokens))
                                     .font(.system(size: 11, design: .monospaced)) 
                                     .lineLimit(1)
                                     .foregroundStyle(theme.foreground)
@@ -131,7 +131,7 @@ struct PopoverView: View {
             Spacer(minLength: 0)
 
             // MARK: - Continuous Bar Chart
-            ContinuousBarChart(summary: summary, theme: theme)
+            ContinuousBarChart(summary: summary, theme: theme, period: period)
                 .frame(height: 8) 
                 .padding(.horizontal, 12)
                 .padding(.bottom, 6)
@@ -153,7 +153,7 @@ struct PopoverView: View {
                 Spacer()
                 
                 if let last = store.lastRefresh {
-                    Text(timeAgo(last))
+                    Text(Formatting.timeAgo(last))
                         .font(.system(size: 10))
                         .foregroundStyle(theme.secondaryForeground)
                 }
@@ -164,33 +164,14 @@ struct PopoverView: View {
         .frame(width: 300, height: 200) 
         .background(theme.panelBackground)
         .foregroundStyle(theme.foreground)
-        .task { await store.refreshAll() }
-    }
-    
-    // Custom number formatter to match "48.5M", "730K"
-    private func formatLargeNumber(_ num: Int64) -> String {
-        let d = Double(num)
-        if d >= 1_000_000 {
-            return String(format: "%.1fM", d / 1_000_000)
-        } else if d >= 1_000 {
-            return String(format: "%.0fK", d / 1_000)
-        } else {
-            return "\(num)"
-        }
-    }
-
-    private func timeAgo(_ date: Date) -> String {
-        let s = Int(Date().timeIntervalSince(date))
-        if s < 60 { return "\(s)s ago" }
-        if s < 3600 { return "\(s / 60)m ago" }
-        return "\(s / 3600)h ago"
     }
 }
 
 // MARK: - Continuous Stacked Bar
 struct ContinuousBarChart: View {
     let summary: TodaySummary
-    let theme: Theme // Added theme property
+    let theme: Theme
+    let period: TimePeriod
     
     var body: some View {
         GeometryReader { geo in
@@ -214,18 +195,20 @@ struct ContinuousBarChart: View {
                 
                 Spacer(minLength: 0)
                 
-                Text(summary.periodLabel)
+                Text(periodLabel)
                     .font(.system(size: 11))
                     .foregroundStyle(Color.gray)
                     .padding(.leading, 4)
             }
         }
     }
-}
 
-extension TodaySummary {
-    var periodLabel: String {
-        // Just a static label for the chart
-        "24h" // We can make this dynamic based on the selected period if needed
+    private var periodLabel: String {
+        switch period {
+        case .today: return "24h"
+        case .week: return "7d"
+        case .month: return "30d"
+        case .all: return "All"
+        }
     }
 }

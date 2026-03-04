@@ -30,7 +30,7 @@ public class TokscaleEngine {
     }
     
     // Parses and prices all client messages, deduplicating them.
-    private func fetchAndParseAllMessages(scanResult: ScanResult, clients: [String]) async -> [UnifiedMessage] {
+    private func fetchAndParseAllMessages(scanResult: ScanResult, clients: [String], timeZone: TimeZone?) async -> [UnifiedMessage] {
         await ensurePricingInitialized()
         
         let processMessage: (UnifiedMessage) -> UnifiedMessage = { msg in
@@ -45,6 +45,13 @@ public class TokscaleEngine {
             )
             if calculated > 0 || m.cost == 0 {
                 m.cost = calculated
+            }
+            if let tz = timeZone {
+                let date = Date(timeIntervalSince1970: TimeInterval(m.timestamp) / 1000.0)
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                formatter.timeZone = tz
+                m.date = formatter.string(from: date)
             }
             return m
         }
@@ -180,6 +187,41 @@ public class TokscaleEngine {
         return filtered
     }
     
+    // MARK: - Unified Entry Point (single scan + parse for all reports)
+    
+    /// Snapshot containing all report types, built from a single scan+parse pass.
+    public struct EngineSnapshot {
+        public let modelReport: ModelReport
+        public let monthlyReport: MonthlyReport
+        public let graphResult: GraphResult
+    }
+    
+    /// Fetches all reports in one pass: scans the file system once, parses messages once,
+    /// then builds ModelReport, MonthlyReport, and GraphResult from the same data.
+    public func fetchAll(options: ReportOptions) async throws -> EngineSnapshot {
+        let startTime = Date()
+        await ensurePricingInitialized()
+        
+        let homeDir = options.homeDir ?? NSHomeDirectory()
+        let clients = options.clients ?? ClientId.allCases.map { $0.rawValue }
+        
+        let scanResult = Scanner.scanAllClients(homeDir: homeDir, clients: clients)
+        let allMessages = await fetchAndParseAllMessages(scanResult: scanResult, clients: clients, timeZone: options.timeZone)
+        let filtered = filterMessages(messages: allMessages, options: options)
+        
+        let modelReport = buildModelReport(from: filtered, options: options, startTime: startTime)
+        let monthlyReport = buildMonthlyReport(from: filtered, startTime: startTime)
+        let graphResult = buildGraphResult(from: filtered, startTime: startTime)
+        
+        return EngineSnapshot(
+            modelReport: modelReport,
+            monthlyReport: monthlyReport,
+            graphResult: graphResult
+        )
+    }
+    
+    // MARK: - Individual Public APIs (kept for backward compatibility)
+    
     public func getModelReport(options: ReportOptions) async throws -> ModelReport {
         let startTime = Date()
         await ensurePricingInitialized()
@@ -188,9 +230,43 @@ public class TokscaleEngine {
         let clients = options.clients ?? ClientId.allCases.map { $0.rawValue }
         
         let scanResult = Scanner.scanAllClients(homeDir: homeDir, clients: clients)
-        let allMessages = await fetchAndParseAllMessages(scanResult: scanResult, clients: clients)
+        let allMessages = await fetchAndParseAllMessages(scanResult: scanResult, clients: clients, timeZone: options.timeZone)
         let filtered = filterMessages(messages: allMessages, options: options)
         
+        return buildModelReport(from: filtered, options: options, startTime: startTime)
+    }
+    
+    public func getMonthlyReport(options: ReportOptions) async throws -> MonthlyReport {
+        let startTime = Date()
+        await ensurePricingInitialized()
+        
+        let homeDir = options.homeDir ?? NSHomeDirectory()
+        let clients = options.clients ?? ClientId.allCases.map { $0.rawValue }
+        
+        let scanResult = Scanner.scanAllClients(homeDir: homeDir, clients: clients)
+        let allMessages = await fetchAndParseAllMessages(scanResult: scanResult, clients: clients, timeZone: options.timeZone)
+        let filtered = filterMessages(messages: allMessages, options: options)
+        
+        return buildMonthlyReport(from: filtered, startTime: startTime)
+    }
+    
+    public func generateGraph(options: ReportOptions) async throws -> GraphResult {
+        let startTime = Date()
+        await ensurePricingInitialized()
+        
+        let homeDir = options.homeDir ?? NSHomeDirectory()
+        let clients = options.clients ?? ClientId.allCases.map { $0.rawValue }
+        
+        let scanResult = Scanner.scanAllClients(homeDir: homeDir, clients: clients)
+        let allMessages = await fetchAndParseAllMessages(scanResult: scanResult, clients: clients, timeZone: options.timeZone)
+        let filtered = filterMessages(messages: allMessages, options: options)
+        
+        return buildGraphResult(from: filtered, startTime: startTime)
+    }
+    
+    // MARK: - Private Report Builders
+    
+    private func buildModelReport(from filtered: [UnifiedMessage], options: ReportOptions, startTime: Date) -> ModelReport {
         var modelMap: [String: ModelUsage] = [:]
         
         for msg in filtered {
@@ -273,23 +349,14 @@ public class TokscaleEngine {
         )
     }
     
-    public func getMonthlyReport(options: ReportOptions) async throws -> MonthlyReport {
-        let startTime = Date()
-        await ensurePricingInitialized()
-        
-        let homeDir = options.homeDir ?? NSHomeDirectory()
-        let clients = options.clients ?? ClientId.allCases.map { $0.rawValue }
-        
-        let scanResult = Scanner.scanAllClients(homeDir: homeDir, clients: clients)
-        let allMessages = await fetchAndParseAllMessages(scanResult: scanResult, clients: clients)
-        let filtered = filterMessages(messages: allMessages, options: options)
-        
+    private func buildMonthlyReport(from filtered: [UnifiedMessage], startTime: Date) -> MonthlyReport {
         class MonthAgg {
             var models = Set<String>()
             var input: Int64 = 0
             var output: Int64 = 0
             var cacheRead: Int64 = 0
             var cacheWrite: Int64 = 0
+            var reasoning: Int64 = 0
             var messageCount: Int32 = 0
             var cost: Double = 0.0
         }
@@ -308,6 +375,7 @@ public class TokscaleEngine {
             entry.output += msg.tokens.output
             entry.cacheRead += msg.tokens.cacheRead
             entry.cacheWrite += msg.tokens.cacheWrite
+            entry.reasoning += msg.tokens.reasoning
             entry.messageCount += 1
             entry.cost += msg.cost
         }
@@ -320,6 +388,7 @@ public class TokscaleEngine {
                 output: agg.output,
                 cacheRead: agg.cacheRead,
                 cacheWrite: agg.cacheWrite,
+                reasoning: agg.reasoning,
                 messageCount: agg.messageCount,
                 cost: agg.cost
             )
@@ -337,17 +406,7 @@ public class TokscaleEngine {
         )
     }
     
-    public func generateGraph(options: ReportOptions) async throws -> GraphResult {
-        let startTime = Date()
-        await ensurePricingInitialized()
-        
-        let homeDir = options.homeDir ?? NSHomeDirectory()
-        let clients = options.clients ?? ClientId.allCases.map { $0.rawValue }
-        
-        let scanResult = Scanner.scanAllClients(homeDir: homeDir, clients: clients)
-        let allMessages = await fetchAndParseAllMessages(scanResult: scanResult, clients: clients)
-        let filtered = filterMessages(messages: allMessages, options: options)
-        
+    private func buildGraphResult(from filtered: [UnifiedMessage], startTime: Date) -> GraphResult {
         let contributions = Aggregator.aggregateByDate(messages: filtered)
         
         let processingTime = UInt32(-startTime.timeIntervalSinceNow * 1000)

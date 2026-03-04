@@ -114,7 +114,7 @@ struct StatsTab: View {
                     Text("·").foregroundStyle(theme.border)
                     ForEach(1..<5) { i in
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(store.currentTheme.colors[i])
+                            .fill(theme.colors[i])
                             .frame(width: 12, height: 12)
                     }
                     Text("More").font(.system(size: 11, design: .monospaced)).foregroundStyle(theme.secondaryForeground)
@@ -211,6 +211,8 @@ struct StatsTab: View {
                                         Text(Formatting.formatTokens(m.tokens.cacheRead)).foregroundStyle(theme.foreground)
                                         Text(" · CW: ").foregroundStyle(theme.secondaryForeground)
                                         Text(Formatting.formatTokens(m.tokens.cacheWrite)).foregroundStyle(theme.foreground)
+                                        Text(" · RS: ").foregroundStyle(theme.secondaryForeground)
+                                        Text(Formatting.formatTokens(m.tokens.reasoning)).foregroundStyle(theme.foreground)
                                     }
                                 }
                                 .font(.system(size: 11, design: .monospaced))

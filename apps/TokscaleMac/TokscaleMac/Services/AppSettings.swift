@@ -49,8 +49,6 @@ final class AppSettings {
         }
     }
 
-    // MARK: - Computed
-
     /// Returns a Calendar configured for the user's preferred timezone.
     var calendar: Calendar {
         var cal = Calendar(identifier: .gregorian)
