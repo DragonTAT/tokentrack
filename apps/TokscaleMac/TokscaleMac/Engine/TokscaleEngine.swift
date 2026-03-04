@@ -48,6 +48,16 @@ public class TokscaleEngine {
             }
             return m
         }
+
+        let hasAnyUsage: (UnifiedMessage) -> Bool = { msg in
+            let t = msg.tokens
+            return t.input > 0 ||
+                t.output > 0 ||
+                t.cacheRead > 0 ||
+                t.cacheWrite > 0 ||
+                t.reasoning > 0 ||
+                msg.cost > 0
+        }
         
         print("[tokscale] ScanResult total files: \(scanResult.totalFiles())")
         for (client, files) in scanResult.files {
@@ -78,14 +88,33 @@ public class TokscaleEngine {
 
         // 1. OpenCode
         if clients.contains("opencode") {
-            for url in scanResult.files[.opencode] ?? [] {
-                let msgs = safeParse(url, OpenCodeParser.parse)
-                for m in msgs {
-                    if shouldAdd(m) {
-                        allMessages.append(processMessage(m))
-                    }
+            var openCodeMessages: [UnifiedMessage] = []
+            var openCodeSource = "json"
+
+            if let dbURL = scanResult.opencodeDB {
+                let dbMessages = safeParse(dbURL, OpenCodeParser.parse)
+                if !dbMessages.isEmpty {
+                    openCodeMessages = dbMessages
+                    openCodeSource = "db"
+                } else {
+                    print("[tokscale] OpenCode DB yielded no messages, falling back to JSON storage")
                 }
             }
+
+            if openCodeMessages.isEmpty {
+                for url in scanResult.files[.opencode] ?? [] {
+                    openCodeMessages.append(contentsOf: safeParse(url, OpenCodeParser.parse))
+                }
+            }
+
+            for m in openCodeMessages {
+                let priced = processMessage(m)
+                if !hasAnyUsage(priced) { continue }
+                if shouldAdd(priced) {
+                    allMessages.append(priced)
+                }
+            }
+            print("[tokscale] OpenCode source: \(openCodeSource)")
             print("[tokscale] OpenCode total: \(allMessages.count) messages")
         }
         
@@ -94,8 +123,10 @@ public class TokscaleEngine {
             for url in scanResult.files[.claude] ?? [] {
                 let msgs = safeParse(url, ClaudeParser.parse)
                 for m in msgs {
-                    if shouldAdd(m) {
-                        allMessages.append(processMessage(m))
+                    let priced = processMessage(m)
+                    if !hasAnyUsage(priced) { continue }
+                    if shouldAdd(priced) {
+                        allMessages.append(priced)
                     }
                 }
             }
@@ -117,10 +148,12 @@ public class TokscaleEngine {
             if clients.contains(config.0) {
                 for type in config.1 {
                     for url in scanResult.files[type] ?? [] {
-                        let msgs = (try? safeParse(url, config.2)) ?? []
+                        let msgs = safeParse(url, config.2)
                         for m in msgs {
-                            if shouldAdd(m) {
-                                allMessages.append(processMessage(m))
+                            let priced = processMessage(m)
+                            if !hasAnyUsage(priced) { continue }
+                            if shouldAdd(priced) {
+                                allMessages.append(priced)
                             }
                         }
                     }

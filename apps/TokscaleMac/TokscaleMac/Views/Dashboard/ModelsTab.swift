@@ -42,11 +42,8 @@ struct ModelsTab: View {
             }
             .width(min: ModelsColumnLayout.modelMin, ideal: layout.model)
 
-            TableColumn("Source") { model in
-                Text(AppColors.clientDisplayName(model.client))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            TableColumn("Source / Provider") { model in
+                sourceCell(for: model)
             }
             .width(min: ModelsColumnLayout.sourceMin, ideal: layout.source)
 
@@ -110,11 +107,8 @@ struct ModelsTab: View {
             }
             .width(min: ModelsColumnLayout.modelMin, ideal: layout.model)
 
-            TableColumn("Source") { model in
-                Text(AppColors.clientDisplayName(model.client))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            TableColumn("Source / Provider") { model in
+                sourceCell(for: model)
             }
             .width(min: ModelsColumnLayout.sourceMin, ideal: layout.source)
 
@@ -168,6 +162,28 @@ struct ModelsTab: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
+    }
+
+    private func sourceCell(for model: ModelUsage) -> some View {
+        Text(sourceLabel(for: model))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+    }
+
+    private func sourceLabel(for model: ModelUsage) -> String {
+        let client = AppColors.clientDisplayName(model.client)
+        let providers = model.provider
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { AppColors.providerDisplayName($0) }
+
+        if providers.isEmpty {
+            return client
+        }
+
+        return "\(client) · \(providers.joined(separator: ", "))"
     }
 
     private func tokenColumn(

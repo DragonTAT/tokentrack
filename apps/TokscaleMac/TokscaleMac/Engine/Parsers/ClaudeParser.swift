@@ -47,6 +47,11 @@ public class ClaudeParser: SessionParser {
                     guard let message = entry.message else { continue }
                     guard let usage = message.usage else { continue }
                     guard let model = message.model else { continue }
+                    let normalizedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Claude emits synthetic non-billable assistant records for auth/limit/system notices.
+                    if normalizedModel.isEmpty || normalizedModel == "<synthetic>" {
+                        continue
+                    }
                     
                     var dedupKey: String? = nil
                     if let msgId = message.id, let reqId = entry.requestId {
@@ -86,10 +91,18 @@ public class ClaudeParser: SessionParser {
                         cacheWrite: max(0, cacheWrite),
                         reasoning: 0
                     )
+
+                    // Skip empty usage records so they do not appear as fake "models" in the UI.
+                    if breakdown.input == 0 &&
+                        breakdown.output == 0 &&
+                        breakdown.cacheRead == 0 &&
+                        breakdown.cacheWrite == 0 {
+                        continue
+                    }
                     
                     messages.append(UnifiedMessage(
                         client: "claude",
-                        modelId: model,
+                        modelId: normalizedModel,
                         providerId: "anthropic",
                         sessionId: sessionId,
                         timestamp: timestamp,
