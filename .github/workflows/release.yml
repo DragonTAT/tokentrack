@@ -164,9 +164,14 @@ jobs:
             --sign "$SIGNING_IDENTITY" \
             "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
 
-          # Sign resource bundles if they contain binaries natively (just in case)
-          if [ -d "dist/${APP_NAME}.app/Contents/Resources" ]; then
-             find "dist/${APP_NAME}.app/Contents/Resources" -type f -name "*.dylib" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
+          # Sign resource bundles and dynamic libraries from inside out
+          if [ -d "dist/${APP_NAME}.app/Contents" ]; then
+             # Sign inner dylibs
+             find "dist/${APP_NAME}.app/Contents" -type f -name "*.dylib" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
+             # Sign inner frameworks
+             find "dist/${APP_NAME}.app/Contents" -type d -name "*.framework" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
+             # Sign inner bundles
+             find "dist/${APP_NAME}.app/Contents" -type d -name "*.bundle" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
           fi
 
           # Sign the app bundle
