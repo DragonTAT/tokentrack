@@ -164,6 +164,13 @@ struct PopoverView: View {
         .frame(width: 300, height: 200) 
         .background(theme.panelBackground)
         .foregroundStyle(theme.foreground)
+        .onAppear {
+            Task { @MainActor in
+                if store.needsRefresh(minInterval: 30) {
+                    await store.refreshAll()
+                }
+            }
+        }
     }
 }
 

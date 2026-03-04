@@ -32,6 +32,10 @@ public class TokscaleEngine {
     // Parses and prices all client messages, deduplicating them.
     private func fetchAndParseAllMessages(scanResult: ScanResult, clients: [String], timeZone: TimeZone?) async -> [UnifiedMessage] {
         await ensurePricingInitialized()
+        let effectiveTimeZone = timeZone ?? .current
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = effectiveTimeZone
         
         let processMessage: (UnifiedMessage) -> UnifiedMessage = { msg in
             var m = msg
@@ -46,13 +50,8 @@ public class TokscaleEngine {
             if calculated > 0 || m.cost == 0 {
                 m.cost = calculated
             }
-            if let tz = timeZone {
-                let date = Date(timeIntervalSince1970: TimeInterval(m.timestamp) / 1000.0)
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM-dd"
-                formatter.timeZone = tz
-                m.date = formatter.string(from: date)
-            }
+            let date = Date(timeIntervalSince1970: TimeInterval(m.timestamp) / 1000.0)
+            m.date = dateFormatter.string(from: date)
             return m
         }
 

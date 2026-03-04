@@ -69,6 +69,12 @@ final class DataStore {
         isLoading = false
     }
 
+    func needsRefresh(minInterval: TimeInterval = 30) -> Bool {
+        if isLoading { return false }
+        guard let lastRefresh else { return true }
+        return Date().timeIntervalSince(lastRefresh) >= minInterval
+    }
+
     // Theme management moved to AppSettings + SwiftUI environment.
     // Use AppSettings.shared.themeName directly.
 

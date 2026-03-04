@@ -33,8 +33,10 @@ public struct UnifiedMessage: Codable, Equatable {
         self.agent = agent
         self.dedupKey = dedupKey
         
-        // Date is set to empty here; the engine's processMessage will
-        // recalculate it with the correct timezone from user settings.
-        self.date = ""
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000.0)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = .current
+        self.date = formatter.string(from: date)
     }
 }
