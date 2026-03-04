@@ -255,11 +255,21 @@ jobs:
 
           mkdir -p dist
           mkdir -p "${BUNDLE}/Contents/MacOS"
+          mkdir -p "${BUNDLE}/Contents/Frameworks"
           mkdir -p "${BUNDLE}/Contents/Resources"
 
           # Copy main binary
           cp apps/TokscaleMac/.build/release/TokscaleMac "${BUNDLE}/Contents/MacOS/${APP_NAME}"
           chmod +x "${BUNDLE}/Contents/MacOS/${APP_NAME}"
+
+          # SwiftPM executable is linked with @loader_path for Sparkle,
+          # so Sparkle.framework must live next to the binary in Contents/MacOS.
+          if [ -d "apps/TokscaleMac/.build/release/Sparkle.framework" ]; then
+            cp -R "apps/TokscaleMac/.build/release/Sparkle.framework" "${BUNDLE}/Contents/MacOS/"
+          else
+            echo "::error::Sparkle.framework not found in apps/TokscaleMac/.build/release"
+            exit 1
+          fi
 
           # Fix: Copy SPM resource bundles to prevent crash on launch
           # Swift Packages output a .bundle for their resources alongside the binary.
@@ -332,6 +342,12 @@ jobs:
           echo "Packaged app SDK: $sdk_ver"
           if ! version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
             echo "::warning::Packaged app SDK $sdk_ver is below preferred $REQUIRED_MACOS_SDK. Publishing will continue, but macOS 26 glass effects may degrade."
+          fi
+
+          SPARKLE_LIB="dist/${APP_NAME}.app/Contents/MacOS/Sparkle.framework/Versions/B/Sparkle"
+          if [ ! -f "$SPARKLE_LIB" ]; then
+            echo "::error::Missing Sparkle runtime at $SPARKLE_LIB. App will fail to launch."
+            exit 1
           fi
 
           echo "RELEASE_ARCH=$arch" >> "$GITHUB_ENV"
