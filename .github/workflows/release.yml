@@ -262,13 +262,18 @@ jobs:
           cp apps/TokscaleMac/.build/release/TokscaleMac "${BUNDLE}/Contents/MacOS/${APP_NAME}"
           chmod +x "${BUNDLE}/Contents/MacOS/${APP_NAME}"
 
-          # SwiftPM executable is linked with @loader_path for Sparkle,
-          # so Sparkle.framework must live next to the binary in Contents/MacOS.
+          # Place Sparkle in the canonical Frameworks location.
           if [ -d "apps/TokscaleMac/.build/release/Sparkle.framework" ]; then
-            cp -R "apps/TokscaleMac/.build/release/Sparkle.framework" "${BUNDLE}/Contents/MacOS/"
+            cp -R "apps/TokscaleMac/.build/release/Sparkle.framework" "${BUNDLE}/Contents/Frameworks/"
           else
             echo "::error::Sparkle.framework not found in apps/TokscaleMac/.build/release"
             exit 1
+          fi
+
+          # Ensure binary can resolve frameworks from Contents/Frameworks.
+          BIN="${BUNDLE}/Contents/MacOS/${APP_NAME}"
+          if ! otool -l "$BIN" | awk '/LC_RPATH/{f=1; next} f && $1=="path" {print $2; f=0}' | grep -Fxq '@loader_path/../Frameworks'; then
+            install_name_tool -add_rpath "@loader_path/../Frameworks" "$BIN"
           fi
 
           # Fix: Copy SPM resource bundles to prevent crash on launch
@@ -344,7 +349,7 @@ jobs:
             echo "::warning::Packaged app SDK $sdk_ver is below preferred $REQUIRED_MACOS_SDK. Publishing will continue, but macOS 26 glass effects may degrade."
           fi
 
-          SPARKLE_LIB="dist/${APP_NAME}.app/Contents/MacOS/Sparkle.framework/Versions/B/Sparkle"
+          SPARKLE_LIB="dist/${APP_NAME}.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle"
           if [ ! -f "$SPARKLE_LIB" ]; then
             echo "::error::Missing Sparkle runtime at $SPARKLE_LIB. App will fail to launch."
             exit 1
@@ -364,6 +369,27 @@ jobs:
 
           # Sign dynamic libraries and frameworks from inside out
           if [ -d "dist/${APP_NAME}.app/Contents" ]; then
+             SPARKLE_BASE="dist/${APP_NAME}.app/Contents/Frameworks/Sparkle.framework/Versions/B"
+
+             # Sparkle embeds helper binaries/XPCs/apps that must be signed before the framework itself.
+             if [ -d "$SPARKLE_BASE" ]; then
+               if [ -f "$SPARKLE_BASE/Autoupdate" ]; then
+                 codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" "$SPARKLE_BASE/Autoupdate"
+               fi
+               if [ -d "$SPARKLE_BASE/XPCServices/Downloader.xpc" ]; then
+                 codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" "$SPARKLE_BASE/XPCServices/Downloader.xpc"
+               fi
+               if [ -d "$SPARKLE_BASE/XPCServices/Installer.xpc" ]; then
+                 codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" "$SPARKLE_BASE/XPCServices/Installer.xpc"
+               fi
+               if [ -f "$SPARKLE_BASE/Updater.app/Contents/MacOS/Updater" ]; then
+                 codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" "$SPARKLE_BASE/Updater.app/Contents/MacOS/Updater"
+               fi
+               if [ -d "$SPARKLE_BASE/Updater.app" ]; then
+                 codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" "$SPARKLE_BASE/Updater.app"
+               fi
+             fi
+
              # Sign inner dylibs
              find "dist/${APP_NAME}.app/Contents" -type f -name "*.dylib" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
              # Sign inner frameworks (if any exist)
@@ -441,11 +467,29 @@ jobs:
           fi
 
           echo "Submitting DMG for notarization..."
+          NOTARY_JSON="$RUNNER_TEMP/notary_result.json"
           xcrun notarytool submit "$DMG_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait
+            --wait \
+            --output-format json > "$NOTARY_JSON"
+
+          SUBMISSION_ID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("id",""))' "$NOTARY_JSON")
+          NOTARY_STATUS=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("status",""))' "$NOTARY_JSON")
+          echo "Notary submission id: $SUBMISSION_ID"
+          echo "Notary status: $NOTARY_STATUS"
+
+          if [ "$NOTARY_STATUS" != "Accepted" ]; then
+            echo "::error::Notarization failed with status '$NOTARY_STATUS' (id: $SUBMISSION_ID)"
+            if [ -n "${SUBMISSION_ID:-}" ]; then
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" || true
+            fi
+            exit 1
+          fi
 
           echo "Stapling notarization ticket to DMG..."
           xcrun stapler staple "$DMG_PATH"
