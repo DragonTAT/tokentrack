@@ -62,10 +62,6 @@ jobs:
 
             echo "  - $(basename "$app"): Xcode $xcode_ver, macOS SDK $sdk_ver"
 
-            if ! version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
-              continue
-            fi
-
             if [ "$xcode_ver" = "$REQUIRED_XCODE" ]; then
               EXACT_APP="$app"
               EXACT_SDK_VER="$sdk_ver"
@@ -91,10 +87,14 @@ jobs:
             SELECTED_APP="$FALLBACK_APP"
             SELECTED_XCODE_VER="$FALLBACK_XCODE_VER"
             SELECTED_SDK_VER="$FALLBACK_SDK_VER"
-            echo "::warning::Required Xcode $REQUIRED_XCODE not found. Falling back to Xcode $SELECTED_XCODE_VER with macOS SDK $SELECTED_SDK_VER."
+            echo "::warning::Preferred Xcode $REQUIRED_XCODE not found. Falling back to Xcode $SELECTED_XCODE_VER with macOS SDK $SELECTED_SDK_VER."
           else
-            echo "::error::No Xcode with macOS SDK >= $REQUIRED_MACOS_SDK found on runner."
+            echo "::error::No usable Xcode installation found on runner."
             exit 1
+          fi
+
+          if ! version_ge "$SELECTED_SDK_VER" "$REQUIRED_MACOS_SDK"; then
+            echo "::warning::Selected Xcode SDK $SELECTED_SDK_VER is below preferred $REQUIRED_MACOS_SDK. Proceeding in publish-first mode."
           fi
 
           BEST_DEV_DIR="$SELECTED_APP/Contents/Developer"
@@ -244,8 +244,7 @@ jobs:
 
           echo "Binary SDK: $sdk_ver"
           if ! version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
-            echo "::error::Binary SDK $sdk_ver is below required $REQUIRED_MACOS_SDK. Current runner/Xcode cannot build macOS 26 glass effects correctly."
-            exit 1
+            echo "::warning::Binary SDK $sdk_ver is below preferred $REQUIRED_MACOS_SDK. Publishing will continue, but macOS 26 glass effects may degrade."
           fi
 
       # ── Create app bundle ────────────────────────────────────────
@@ -330,8 +329,7 @@ jobs:
 
           echo "Packaged app SDK: $sdk_ver"
           if ! version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
-            echo "::error::Packaged app SDK $sdk_ver is below required $REQUIRED_MACOS_SDK."
-            exit 1
+            echo "::warning::Packaged app SDK $sdk_ver is below preferred $REQUIRED_MACOS_SDK. Publishing will continue, but macOS 26 glass effects may degrade."
           fi
 
           echo "RELEASE_ARCH=$arch" >> "$GITHUB_ENV"
