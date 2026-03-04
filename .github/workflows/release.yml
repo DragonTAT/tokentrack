@@ -480,6 +480,36 @@ jobs:
           cat dist/appcast.xml
           echo "✅ Appcast generated"
 
+      - name: Validate Sparkle signing chain
+        env:
+          SPARKLE_ED25519_PUBLIC_KEY: ${{ secrets.SPARKLE_ED25519_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+
+          APP_PLIST="dist/${APP_NAME}.app/Contents/Info.plist"
+          if [ ! -f "$APP_PLIST" ]; then
+            echo "::error::Info.plist not found at $APP_PLIST"
+            exit 1
+          fi
+
+          if [ -z "${SPARKLE_ED25519_PUBLIC_KEY:-}" ]; then
+            echo "::error::SPARKLE_ED25519_PUBLIC_KEY secret is missing"
+            exit 1
+          fi
+
+          APP_PUB=$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP_PLIST")
+          if [ "$APP_PUB" != "$SPARKLE_ED25519_PUBLIC_KEY" ]; then
+            echo "::error::SUPublicEDKey does not match SPARKLE_ED25519_PUBLIC_KEY secret"
+            exit 1
+          fi
+
+          if ! grep -q 'sparkle:edSignature=' dist/appcast.xml; then
+            echo "::error::appcast.xml missing sparkle:edSignature; Sparkle signing chain is broken"
+            exit 1
+          fi
+
+          echo "✅ Sparkle signing chain validated"
+
       # ── Upload artifact ──────────────────────────────────────────
       - name: Upload artifact
         uses: actions/upload-artifact@v4
