@@ -10,8 +10,12 @@ permissions:
 
 jobs:
   build-macos-app:
-    name: Build macOS App
+    name: Build & Sign macOS App
     runs-on: macos-latest
+
+    env:
+      APP_NAME: TokenTrack
+      BUNDLE_ID: com.dragontat.tokentrack
 
     steps:
       - name: Checkout
@@ -24,70 +28,178 @@ jobs:
         id: version
         run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # ── Import Developer ID certificate ──────────────────────────
+      - name: Import signing certificate
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create a temporary keychain
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Decode and import the certificate
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security import "$CERT_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # Allow codesign to access the keychain without prompting
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Add the temporary keychain to the search list
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          # Expose for later steps
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+
+          # Find the signing identity
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          echo "SIGNING_IDENTITY=$IDENTITY" >> $GITHUB_ENV
+          echo "Found signing identity: $IDENTITY"
+
+      # ── Build ────────────────────────────────────────────────────
       - name: Build (release)
         working-directory: apps/TokscaleMac
         run: swift build -c release
 
+      # ── Create app bundle ────────────────────────────────────────
       - name: Create app bundle
         run: |
-          APP_NAME="TokenTrack"
           VERSION="${{ steps.version.outputs.value }}"
-          BUILD_DIR="apps/TokscaleMac/.build/release"
-          BUNDLE_DIR="dist/${APP_NAME}.app"
+          BUNDLE="dist/${APP_NAME}.app"
 
           mkdir -p dist
-          mkdir -p "${BUNDLE_DIR}/Contents/MacOS"
-          mkdir -p "${BUNDLE_DIR}/Contents/Resources"
+          mkdir -p "${BUNDLE}/Contents/MacOS"
+          mkdir -p "${BUNDLE}/Contents/Resources"
 
-          cp "${BUILD_DIR}/TokscaleMac" "${BUNDLE_DIR}/Contents/MacOS/${APP_NAME}"
+          cp apps/TokscaleMac/.build/release/TokscaleMac "${BUNDLE}/Contents/MacOS/${APP_NAME}"
+          chmod +x "${BUNDLE}/Contents/MacOS/${APP_NAME}"
 
-          # Copy resources if they exist
-          if [ -d "apps/TokscaleMac/TokscaleMac/Resources" ]; then
-            cp -r apps/TokscaleMac/TokscaleMac/Resources/. "${BUNDLE_DIR}/Contents/Resources/"
-          fi
+          cp apps/TokscaleMac/TokscaleMac/Engine/Pricing/builtin.json "${BUNDLE}/Contents/Resources/"
+          cp apps/TokscaleMac/TokscaleMac/Resources/AppIcon.icns "${BUNDLE}/Contents/Resources/"
 
-          # Copy builtin.json into Resources
-          cp apps/TokscaleMac/TokscaleMac/Engine/Pricing/builtin.json "${BUNDLE_DIR}/Contents/Resources/"
-
-          # Write Info.plist
-          cat > "${BUNDLE_DIR}/Contents/Info.plist" <<EOF
+          cat > "${BUNDLE}/Contents/Info.plist" <<'PLIST_EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-            <key>CFBundleName</key><string>${APP_NAME}</string>
+            <key>CFBundleName</key><string>TokenTrack</string>
             <key>CFBundleIdentifier</key><string>com.dragontat.tokentrack</string>
-            <key>CFBundleVersion</key><string>${VERSION}</string>
-            <key>CFBundleShortVersionString</key><string>${VERSION}</string>
-            <key>CFBundleExecutable</key><string>${APP_NAME}</string>
+            <key>CFBundleExecutable</key><string>TokenTrack</string>
             <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleIconFile</key><string>AppIcon</string>
             <key>LSMinimumSystemVersion</key><string>14.0</string>
             <key>NSHighResolutionCapable</key><true/>
+            <key>LSUIElement</key><true/>
           </dict>
           </plist>
-          EOF
+          PLIST_EOF
 
-          echo "App bundle created at ${BUNDLE_DIR}"
+          # Fix: remove leading whitespace from heredoc (YAML indentation)
+          sed -i '' 's/^          //' "${BUNDLE}/Contents/Info.plist"
 
+          # Inject version dynamically (avoids shell expansion issues with heredoc)
+          sed -i '' "s|</dict>|  <key>CFBundleVersion</key><string>${VERSION}</string>\n  <key>CFBundleShortVersionString</key><string>${VERSION}</string>\n</dict>|" "${BUNDLE}/Contents/Info.plist"
+
+          echo "── Info.plist ──"
+          cat "${BUNDLE}/Contents/Info.plist"
+
+      # ── Code sign with Developer ID ──────────────────────────────
+      - name: Sign the app
+        run: |
+          echo "Signing with: $SIGNING_IDENTITY"
+
+          # Sign the main binary with hardened runtime
+          codesign --force --timestamp --options runtime \
+            --sign "$SIGNING_IDENTITY" \
+            "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
+
+          # Sign the app bundle
+          codesign --force --timestamp --options runtime \
+            --sign "$SIGNING_IDENTITY" \
+            "dist/${APP_NAME}.app"
+
+          # Verify
+          codesign --verify --deep --strict --verbose=2 "dist/${APP_NAME}.app"
+          echo "✅ Code signing verified"
+
+      # ── Create DMG ───────────────────────────────────────────────
       - name: Create DMG
         run: |
           VERSION="${{ steps.version.outputs.value }}"
-          DMG_NAME="TokenTrack-v${VERSION}-macos-arm64.dmg"
+          ARCH=$(uname -m)
+          DMG_NAME="${APP_NAME}-v${VERSION}-macos-${ARCH}.dmg"
+
+          # Stage DMG contents with Applications shortcut
+          mkdir -p dist/dmg-staging
+          cp -R "dist/${APP_NAME}.app" dist/dmg-staging/
+          ln -s /Applications dist/dmg-staging/Applications
 
           hdiutil create \
-            -volname "TokenTrack" \
-            -srcfolder dist/TokenTrack.app \
+            -volname "${APP_NAME} v${VERSION}" \
+            -srcfolder dist/dmg-staging \
             -ov -format UDZO \
             "dist/${DMG_NAME}"
 
-          echo "DMG created: dist/${DMG_NAME}"
+          # Sign the DMG itself
+          codesign --force --timestamp \
+            --sign "$SIGNING_IDENTITY" \
+            "dist/${DMG_NAME}"
 
-      - name: Upload artifacts
+          echo "DMG_PATH=dist/${DMG_NAME}" >> $GITHUB_ENV
+          echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
+          ls -lh "dist/${DMG_NAME}"
+
+      # ── Notarize ─────────────────────────────────────────────────
+      - name: Notarize DMG
+        env:
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_NOTARY_PRIVATE_KEY_BASE64 }}
+        run: |
+          # Decode the API key
+          KEY_PATH="$RUNNER_TEMP/notary_key.p8"
+          echo "$APPLE_NOTARY_PRIVATE_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+
+          echo "Submitting DMG for notarization..."
+          xcrun notarytool submit "$DMG_PATH" \
+            --key "$KEY_PATH" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --wait
+
+          echo "Stapling notarization ticket to DMG..."
+          xcrun stapler staple "$DMG_PATH"
+
+          echo "✅ Notarization complete"
+
+          # Cleanup
+          rm -f "$KEY_PATH"
+
+      # ── Upload artifact ──────────────────────────────────────────
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: TokenTrack-macos-app
-          path: dist/
+          path: dist/*.dmg
           if-no-files-found: error
+
+      # ── Cleanup keychain ─────────────────────────────────────────
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          if [ -n "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          fi
 
   create-release:
     name: Create GitHub Release
@@ -103,6 +215,5 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            *.dmg
-            *.zip
+          files: "*.dmg"
+          generate_release_notes: true

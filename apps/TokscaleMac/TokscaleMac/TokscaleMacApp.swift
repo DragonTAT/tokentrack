@@ -12,7 +12,7 @@ struct TokscaleMacApp: App {
             PopoverView()
                 .environment(store)
         } label: {
-            Label("TokenTrack", systemImage: "chart.bar.fill")
+            Label("TokenTrack", systemImage: "chart.line.uptrend.xyaxis")
         }
         .menuBarExtraStyle(.window)
 

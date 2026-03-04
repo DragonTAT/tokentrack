@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_NAME="Tokentrack"
 SWIFT_PRODUCT_NAME="${SWIFT_PRODUCT_NAME:-TokscaleMac}"
-BUNDLE_ID="${BUNDLE_ID:-io.tokentrack.mac}"
+BUNDLE_ID="${BUNDLE_ID:-com.dragontat.tokentrack}"
 MIN_MACOS_VERSION="${MIN_MACOS_VERSION:-14.0}"
 
 VERSION="${1:-}"
