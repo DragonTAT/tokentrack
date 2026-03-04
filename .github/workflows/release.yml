@@ -120,9 +120,17 @@ jobs:
           mkdir -p "${BUNDLE}/Contents/MacOS"
           mkdir -p "${BUNDLE}/Contents/Resources"
 
+          # Copy main binary
           cp apps/TokscaleMac/.build/release/TokscaleMac "${BUNDLE}/Contents/MacOS/${APP_NAME}"
           chmod +x "${BUNDLE}/Contents/MacOS/${APP_NAME}"
 
+          # Fix: Copy SPM resource bundles to prevent crash on launch
+          # Swift Packages output a .bundle for their resources alongside the binary.
+          if ls apps/TokscaleMac/.build/release/*.bundle 1> /dev/null 2>&1; then
+            cp -R apps/TokscaleMac/.build/release/*.bundle "${BUNDLE}/Contents/Resources/"
+          fi
+
+          # Copy local resources
           cp apps/TokscaleMac/TokscaleMac/Engine/Pricing/builtin.json "${BUNDLE}/Contents/Resources/"
           cp apps/TokscaleMac/TokscaleMac/Resources/AppIcon.icns "${BUNDLE}/Contents/Resources/"
 
@@ -141,7 +149,7 @@ jobs:
             <key>LSUIElement</key><true/>
           </dict>
           </plist>
-          PLIST_EOF
+PLIST_EOF
 
           # Fix: remove leading whitespace from heredoc (YAML indentation)
           sed -i '' 's/^          //' "${BUNDLE}/Contents/Info.plist"
@@ -162,32 +170,40 @@ jobs:
             --sign "$SIGNING_IDENTITY" \
             "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
 
+          # Sign resource bundles if they contain binaries natively (just in case)
+          if [ -d "dist/${APP_NAME}.app/Contents/Resources" ]; then
+             find "dist/${APP_NAME}.app/Contents/Resources" -type f -name "*.dylib" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
+          fi
+
           # Sign the app bundle
           codesign --force --timestamp --options runtime \
             --sign "$SIGNING_IDENTITY" \
             "dist/${APP_NAME}.app"
 
-          # Verify
-          codesign --verify --deep --strict --verbose=2 "dist/${APP_NAME}.app"
-          echo "✅ Code signing verified"
+          echo "── Verification ──"
+          codesign -dv --verbose=4 "dist/${APP_NAME}.app"
+          spctl --assess --verbose "dist/${APP_NAME}.app"
 
       # ── Create DMG ───────────────────────────────────────────────
       - name: Create DMG
         run: |
-          VERSION="${{ steps.version.outputs.value }}"
-          ARCH=$(uname -m)
-          DMG_NAME="${APP_NAME}-v${VERSION}-macos-${ARCH}.dmg"
+          DMG_NAME="${APP_NAME}-v${{ steps.version.outputs.value }}-macos-arm64.dmg"
+          
+          echo "Installing create-dmg..."
+          brew install create-dmg
 
-          # Stage DMG contents with Applications shortcut
-          mkdir -p dist/dmg-staging
-          cp -R "dist/${APP_NAME}.app" dist/dmg-staging/
-          ln -s /Applications dist/dmg-staging/Applications
-
-          hdiutil create \
-            -volname "${APP_NAME} v${VERSION}" \
-            -srcfolder dist/dmg-staging \
-            -ov -format UDZO \
-            "dist/${DMG_NAME}"
+          echo "Packaging application into $DMG_NAME..."
+          create-dmg \
+            --volname "${APP_NAME}" \
+            --background "apps/TokscaleMac/TokscaleMac/Resources/DMG/background.png" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "${APP_NAME}.app" 150 200 \
+            --hide-extension "${APP_NAME}.app" \
+            --app-drop-link 450 200 \
+            "dist/${DMG_NAME}" \
+            "dist/${APP_NAME}.app"
 
           # Sign the DMG itself
           codesign --force --timestamp \

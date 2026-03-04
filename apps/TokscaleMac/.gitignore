@@ -2,3 +2,4 @@
 TokscaleMac/Resources/*
 !TokscaleMac/Resources/.gitkeep
 !TokscaleMac/Resources/AppIcon.icns
+!TokscaleMac/Resources/DMG/*
