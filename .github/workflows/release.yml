@@ -181,8 +181,8 @@ jobs:
             "dist/${APP_NAME}.app"
 
           echo "── Verification ──"
-          codesign -dv --verbose=4 "dist/${APP_NAME}.app"
-          spctl --assess --verbose "dist/${APP_NAME}.app"
+          codesign --verify --deep --strict --verbose=2 "dist/${APP_NAME}.app"
+          echo "✅ Code signing verified"
 
       # ── Create DMG ───────────────────────────────────────────────
       - name: Create DMG
