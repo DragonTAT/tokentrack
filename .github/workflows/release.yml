@@ -34,37 +34,76 @@ jobs:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
+          set -euo pipefail
+
+          # Verify secrets are present
+          if [ -z "$APPLE_CERTIFICATE_BASE64" ]; then
+            echo "::error::APPLE_CERTIFICATE_BASE64 secret is empty or not configured"
+            exit 1
+          fi
+          echo "✓ APPLE_CERTIFICATE_BASE64 is set (${#APPLE_CERTIFICATE_BASE64} chars)"
+
+          if [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
+            echo "::error::APPLE_CERTIFICATE_PASSWORD secret is empty or not configured"
+            exit 1
+          fi
+          echo "✓ APPLE_CERTIFICATE_PASSWORD is set"
+
           # Create a temporary keychain
+          echo "── Creating temporary keychain ──"
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "✓ Keychain created and unlocked"
 
-          # Decode and import the certificate
+          # Decode the certificate
+          echo "── Decoding certificate ──"
           CERT_PATH="$RUNNER_TEMP/certificate.p12"
           echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          CERT_SIZE=$(wc -c < "$CERT_PATH" | tr -d ' ')
+          echo "✓ Certificate decoded ($CERT_SIZE bytes)"
 
+          if [ "$CERT_SIZE" -lt 100 ]; then
+            echo "::error::Certificate file is too small ($CERT_SIZE bytes). Is the Base64 encoding correct?"
+            exit 1
+          fi
+
+          # Import the certificate
+          echo "── Importing certificate into keychain ──"
           security import "$CERT_PATH" \
             -P "$APPLE_CERTIFICATE_PASSWORD" \
             -A -t cert -f pkcs12 \
             -k "$KEYCHAIN_PATH"
+          echo "✓ Certificate imported"
 
           # Allow codesign to access the keychain without prompting
           security set-key-partition-list -S apple-tool:,apple: \
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "✓ Partition list set"
 
           # Add the temporary keychain to the search list
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          echo "✓ Keychain added to search list"
 
           # Expose for later steps
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
 
           # Find the signing identity
+          echo "── Looking for signing identity ──"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No 'Developer ID Application' identity found in imported certificate"
+            echo "Available identities:"
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+            exit 1
+          fi
           echo "SIGNING_IDENTITY=$IDENTITY" >> $GITHUB_ENV
-          echo "Found signing identity: $IDENTITY"
+          echo "✓ Found signing identity: $IDENTITY"
 
       # ── Build ────────────────────────────────────────────────────
       - name: Build (release)
