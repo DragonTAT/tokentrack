@@ -443,6 +443,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ -z "${SPARKLE_ED25519_KEY:-}" ]; then
+            echo "::error::SPARKLE_ED25519_PRIVATE_KEY secret is missing"
+            exit 1
+          fi
+
           # Locate generate_appcast from the Sparkle checkout in SPM cache
           SPARKLE_BIN=$(find ~/Library/Developer -name generate_appcast -type f 2>/dev/null | head -1 || true)
 
@@ -461,8 +466,14 @@ jobs:
           mkdir -p dist/appcast_input
           cp "$DMG_PATH" dist/appcast_input/
 
+          # Use CI secret key directly (don't rely on keychain lookup on ephemeral runners)
+          KEY_FILE="$RUNNER_TEMP/sparkle_ed25519.key"
+          printf '%s' "$SPARKLE_ED25519_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
           # Generate appcast.xml (signs with EdDSA key from env var)
           "$SPARKLE_BIN" dist/appcast_input/ -o dist/appcast.xml \
+            --ed-key-file "$KEY_FILE" \
             --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/"
 
           echo "── Appcast ──"
