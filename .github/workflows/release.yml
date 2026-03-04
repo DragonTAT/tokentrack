@@ -16,13 +16,85 @@ jobs:
     env:
       APP_NAME: TokenTrack
       BUNDLE_ID: com.dragontat.tokentrack
+      REQUIRED_XCODE: "26.3"
+      REQUIRED_MACOS_SDK: "26.0"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: Select Xcode 26.3
+        id: select_xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version_ge() {
+            # true if $1 >= $2
+            [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+          }
+
+          mapfile -t CANDIDATES < <(find /Applications -maxdepth 1 -type d -name 'Xcode*.app' | sort -V)
+          if [ ${#CANDIDATES[@]} -eq 0 ]; then
+            echo "::error::No Xcode installation found under /Applications."
+            exit 1
+          fi
+
+          BEST_APP=""
+          BEST_SDK_VER=""
+
+          echo "Detected Xcode candidates:"
+          for app in "${CANDIDATES[@]}"; do
+            dev_dir="$app/Contents/Developer"
+            if [ ! -d "$dev_dir" ]; then
+              continue
+            fi
+
+            xcode_ver="$(DEVELOPER_DIR="$dev_dir" xcodebuild -version 2>/dev/null | awk 'NR==1 {print $2}')"
+            sdk_ver="$(DEVELOPER_DIR="$dev_dir" xcrun --sdk macosx --show-sdk-version 2>/dev/null || true)"
+            if [ -z "${xcode_ver:-}" ] || [ -z "${sdk_ver:-}" ]; then
+              echo "  - $(basename "$app"): skipped (missing version or SDK metadata)"
+              continue
+            fi
+
+            echo "  - $(basename "$app"): Xcode $xcode_ver, macOS SDK $sdk_ver"
+
+            if [ "$xcode_ver" = "$REQUIRED_XCODE" ]; then
+              if version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
+                BEST_APP="$app"
+                BEST_SDK_VER="$sdk_ver"
+                break
+              fi
+            fi
+          done
+
+          if [ -z "$BEST_APP" ]; then
+            echo "::error::Required Xcode $REQUIRED_XCODE with macOS SDK >= $REQUIRED_MACOS_SDK not found on runner."
+            exit 1
+          fi
+
+          BEST_DEV_DIR="$BEST_APP/Contents/Developer"
+          echo "Selected Xcode: $(basename "$BEST_APP") (Xcode $REQUIRED_XCODE, macOS SDK $BEST_SDK_VER)"
+
+          echo "DEVELOPER_DIR=$BEST_DEV_DIR" >> "$GITHUB_ENV"
+          echo "xcode_app=$BEST_APP" >> "$GITHUB_OUTPUT"
+          echo "xcode_version=$REQUIRED_XCODE" >> "$GITHUB_OUTPUT"
+          echo "sdk_version=$BEST_SDK_VER" >> "$GITHUB_OUTPUT"
+
+      - name: Build environment fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          {
+            echo "DEVELOPER_DIR=${DEVELOPER_DIR:-unset}"
+            xcodebuild -version
+            swift --version
+            echo "macOS SDK: $(xcrun --sdk macosx --show-sdk-version)"
+            echo "Host architecture: $(uname -m)"
+            echo "UTC build time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } | tee dist/build_fingerprint.txt
 
       - name: Resolve release version
         id: version
@@ -110,6 +182,48 @@ jobs:
         working-directory: apps/TokscaleMac
         run: swift build -c release
 
+      - name: Validate release binary (arm64 + SDK gate)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version_ge() {
+            [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+          }
+
+          BIN="apps/TokscaleMac/.build/release/TokscaleMac"
+          if [ ! -f "$BIN" ]; then
+            echo "::error::Release binary not found at $BIN"
+            exit 1
+          fi
+
+          arch_line="$(lipo -info "$BIN")"
+          echo "$arch_line"
+
+          arch=""
+          if [[ "$arch_line" == *"is architecture:"* ]]; then
+            arch="$(echo "$arch_line" | sed -E 's/.*is architecture: ([^ ]+).*/\1/')"
+          elif [[ "$arch_line" == *"are:"* ]]; then
+            arch="$(echo "$arch_line" | sed -E 's/.*are: (.*)/\1/' | awk '{print $1}')"
+          fi
+
+          if [ "$arch" != "arm64" ]; then
+            echo "::error::Expected arm64 build, got '$arch'."
+            exit 1
+          fi
+
+          sdk_ver="$(otool -l "$BIN" | awk '/LC_BUILD_VERSION/{f=1; next} f && $1=="sdk" {print $2; exit}')"
+          if [ -z "${sdk_ver:-}" ]; then
+            echo "::error::Failed to extract SDK version from $BIN"
+            exit 1
+          fi
+
+          echo "Binary SDK: $sdk_ver"
+          if ! version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
+            echo "::error::Binary SDK $sdk_ver is below required $REQUIRED_MACOS_SDK. Current runner/Xcode cannot build macOS 26 glass effects correctly."
+            exit 1
+          fi
+
       # ── Create app bundle ────────────────────────────────────────
       - name: Create app bundle
         run: |
@@ -154,6 +268,50 @@ jobs:
           echo "── Info.plist ──"
           cat "${BUNDLE}/Contents/Info.plist"
 
+      - name: Validate packaged app binary (arm64 + SDK gate)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version_ge() {
+            [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+          }
+
+          BIN="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
+          if [ ! -f "$BIN" ]; then
+            echo "::error::Packaged app binary not found at $BIN"
+            exit 1
+          fi
+
+          arch_line="$(lipo -info "$BIN")"
+          echo "$arch_line"
+
+          arch=""
+          if [[ "$arch_line" == *"is architecture:"* ]]; then
+            arch="$(echo "$arch_line" | sed -E 's/.*is architecture: ([^ ]+).*/\1/')"
+          elif [[ "$arch_line" == *"are:"* ]]; then
+            arch="$(echo "$arch_line" | sed -E 's/.*are: (.*)/\1/' | awk '{print $1}')"
+          fi
+
+          if [ "$arch" != "arm64" ]; then
+            echo "::error::Expected packaged app to be arm64, got '$arch'."
+            exit 1
+          fi
+
+          sdk_ver="$(otool -l "$BIN" | awk '/LC_BUILD_VERSION/{f=1; next} f && $1=="sdk" {print $2; exit}')"
+          if [ -z "${sdk_ver:-}" ]; then
+            echo "::error::Failed to extract SDK version from packaged app binary."
+            exit 1
+          fi
+
+          echo "Packaged app SDK: $sdk_ver"
+          if ! version_ge "$sdk_ver" "$REQUIRED_MACOS_SDK"; then
+            echo "::error::Packaged app SDK $sdk_ver is below required $REQUIRED_MACOS_SDK."
+            exit 1
+          fi
+
+          echo "RELEASE_ARCH=$arch" >> "$GITHUB_ENV"
+
       # ── Code sign with Developer ID ──────────────────────────────
       - name: Sign the app
         run: |
@@ -187,7 +345,8 @@ jobs:
       # ── Create DMG ───────────────────────────────────────────────
       - name: Create DMG
         run: |
-          DMG_NAME="${APP_NAME}-v${{ steps.version.outputs.value }}-macos-arm64.dmg"
+          ARCH="${RELEASE_ARCH:-arm64}"
+          DMG_NAME="${APP_NAME}-v${{ steps.version.outputs.value }}-macos-${ARCH}.dmg"
           
           echo "Installing create-dmg..."
           brew install create-dmg
@@ -258,7 +417,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: TokenTrack-macos-app
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/build_fingerprint.txt
           if-no-files-found: error
 
       # ── Cleanup keychain ─────────────────────────────────────────
