@@ -13,7 +13,10 @@ final class DataStore {
     var isLoading = false
     var error: String?
     var lastRefresh: Date?
-    var currentTheme: Theme = .from(.blue)
+
+    var currentTheme: Theme {
+        .from(AppSettings.shared.themeName)
+    }
 
     // Stats derived from graph
     var currentStreak: Int = 0
@@ -75,7 +78,7 @@ final class DataStore {
     // MARK: - Theme
 
     func cycleTheme() {
-        currentTheme = .from(currentTheme.name.next)
+        AppSettings.shared.themeName = AppSettings.shared.themeName.next
     }
 
     // MARK: - Period Summary (today / week / month)
@@ -87,14 +90,34 @@ final class DataStore {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        let calendar = Calendar.current
+        formatter.timeZone = AppSettings.shared.calendar.timeZone
+        let calendar = AppSettings.shared.calendar
         let today = Date()
+
+        // For .all, return everything without filtering by date
+        if period == .all {
+            var totalTokens: Int64 = 0
+            var totalCost: Double = 0
+            var clientMap: [String: (tokens: Int64, cost: Double)] = [:]
+            for day in graph.contributions {
+                totalTokens += day.totals.tokens
+                totalCost += day.totals.cost
+                for c in day.clients {
+                    let existing = clientMap[c.client] ?? (0, 0)
+                    clientMap[c.client] = (existing.tokens + c.tokens.total, existing.cost + c.cost)
+                }
+            }
+            let clients = clientMap.map { ClientSummary(client: $0.key, tokens: $0.value.tokens, cost: $0.value.cost) }
+                .sorted { $0.tokens > $1.tokens }
+            return TodaySummary(totalTokens: totalTokens, totalCost: totalCost, clients: clients)
+        }
 
         let cutoff: Date
         switch period {
         case .today: cutoff = calendar.startOfDay(for: today)
         case .week: cutoff = calendar.date(byAdding: .day, value: -7, to: today) ?? today
         case .month: cutoff = calendar.date(byAdding: .day, value: -30, to: today) ?? today
+        case .all: cutoff = today // unreachable, handled above
         }
 
         let cutoffStr = formatter.string(from: cutoff)
@@ -129,6 +152,7 @@ final class DataStore {
     private func buildGraphGrid(from graph: GraphResult) -> GraphGrid {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = AppSettings.shared.calendar.timeZone
 
         let byDate: [String: DailyContribution] = Dictionary(
             graph.contributions.map { ($0.date, $0) },
@@ -140,7 +164,7 @@ final class DataStore {
         let maxTokensDouble = max(Double(maxTokens), 1)
 
         let today = Date()
-        let calendar = Calendar.current
+        let calendar = AppSettings.shared.calendar
         let dayOfWeek = calendar.component(.weekday, from: today) - 1 // 0=Sun
         let totalDays = 53 * 7
         guard let gridStart = calendar.date(byAdding: .day, value: -(totalDays - 1 + dayOfWeek), to: today) else {
@@ -181,6 +205,7 @@ final class DataStore {
     private func computeStreaks(from graph: GraphResult) {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = AppSettings.shared.calendar.timeZone
 
         let activeDates = Set(
             graph.contributions
@@ -188,7 +213,7 @@ final class DataStore {
                 .compactMap { formatter.date(from: $0.date) }
         )
 
-        let calendar = Calendar.current
+        let calendar = AppSettings.shared.calendar
 
         // Current streak (count backwards from today)
         var current = 0

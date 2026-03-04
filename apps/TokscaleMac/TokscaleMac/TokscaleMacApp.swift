@@ -1,16 +1,26 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Notification for opening Settings from AppDelegate
+extension Notification.Name {
+    static let openSettings = Notification.Name("com.dragontat.tokentrack.openSettings")
+}
+
 @main
 struct TokscaleMacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var store = DataStore()
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         // Menu bar popover
         MenuBarExtra {
             PopoverView()
                 .environment(store)
+                .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+                    openWindow(id: "settings")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
         } label: {
             Label("TokenTrack", systemImage: "chart.line.uptrend.xyaxis")
         }
@@ -23,6 +33,13 @@ struct TokscaleMacApp: App {
                 .frame(minWidth: 600, idealWidth: 800, minHeight: 400, idealHeight: 533)
         }
         .defaultSize(width: 800, height: 533)
+
+        // Settings window
+        Window("Settings", id: "settings") {
+            SettingsView()
+                .environment(store)
+        }
+        .windowResizability(.contentSize)
     }
 }
 
@@ -34,22 +51,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         installRightClickMonitor()
     }
 
-    /// Listen for right-click on the menu bar status item and show a Quit context menu.
+    /// Listen for right-click on the menu bar status item and show a context menu.
     private func installRightClickMonitor() {
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .rightMouseUp]) { event in
             // Only react to right-click on the status bar area
             if event.type == .rightMouseDown {
-                DispatchQueue.main.async { self.showQuitMenu() }
+                DispatchQueue.main.async { self.showContextMenu() }
                 return nil // consume the event
             }
             return event
         }
     }
 
-    private func showQuitMenu() {
+    private func showContextMenu() {
         let menu = NSMenu()
         menu.addItem(withTitle: "TokenTrack", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
+
+        let settingsItem = NSMenuItem(title: "Settings\u{2026}", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
+        menu.addItem(.separator())
+
         let quitItem = NSMenuItem(title: "Quit TokenTrack", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -62,6 +86,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let loc = statusBarItem.convertPoint(fromScreen: NSEvent.mouseLocation)
         menu.popUp(positioning: nil, at: loc, in: statusBarItem.contentView)
+    }
+
+    @objc private func openSettings() {
+        NotificationCenter.default.post(name: .openSettings, object: nil)
     }
 
     @objc private func quitApp() {

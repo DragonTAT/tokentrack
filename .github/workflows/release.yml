@@ -285,6 +285,8 @@ jobs:
             <key>LSUIElement</key><true/>
             <key>CFBundleVersion</key><string>${VERSION}</string>
             <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+            <key>SUFeedURL</key><string>https://github.com/${{ github.repository }}/releases/latest/download/appcast.xml</string>
+            <key>SUPublicEDKey</key><string>${{ secrets.SPARKLE_ED25519_PUBLIC_KEY }}</string>
           </dict>
           </plist>" > "${BUNDLE}/Contents/Info.plist"
 
@@ -434,6 +436,39 @@ jobs:
 
           echo "✅ Notarization complete"
 
+      # ── Generate Sparkle Appcast ──────────────────────────────────
+      - name: Generate Sparkle appcast
+        env:
+          SPARKLE_ED25519_KEY: ${{ secrets.SPARKLE_ED25519_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          # Locate generate_appcast from the Sparkle checkout in SPM cache
+          SPARKLE_BIN=$(find ~/Library/Developer -name generate_appcast -type f 2>/dev/null | head -1 || true)
+
+          if [ -z "$SPARKLE_BIN" ]; then
+            echo "::warning::generate_appcast not found in SPM cache. Downloading Sparkle release..."
+            curl -sL https://github.com/sparkle-project/Sparkle/releases/latest/download/Sparkle-2.9.0.tar.xz -o /tmp/sparkle.tar.xz
+            mkdir -p /tmp/sparkle && tar xf /tmp/sparkle.tar.xz -C /tmp/sparkle
+            SPARKLE_BIN="/tmp/sparkle/bin/generate_appcast"
+          fi
+
+          if [ ! -x "$SPARKLE_BIN" ]; then
+            chmod +x "$SPARKLE_BIN"
+          fi
+
+          # Create appcast directory with the DMG
+          mkdir -p dist/appcast_input
+          cp "$DMG_PATH" dist/appcast_input/
+
+          # Generate appcast.xml (signs with EdDSA key from env var)
+          "$SPARKLE_BIN" dist/appcast_input/ -o dist/appcast.xml \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/"
+
+          echo "── Appcast ──"
+          cat dist/appcast.xml
+          echo "✅ Appcast generated"
+
       # ── Upload artifact ──────────────────────────────────────────
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -441,6 +476,7 @@ jobs:
           name: TokenTrack-macos-app
           path: |
             dist/*.dmg
+            dist/appcast.xml
             dist/build_fingerprint.txt
           if-no-files-found: error
 
@@ -466,5 +502,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: "*.dmg"
+          files: |
+            *.dmg
+            appcast.xml
           generate_release_notes: true

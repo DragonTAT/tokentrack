@@ -1,9 +1,10 @@
 import SwiftUI
 
 enum TimePeriod: String, CaseIterable {
-    case today = "Today"
+    case today = "Day"
     case week = "Week"
     case month = "Month"
+    case all = "All"
 }
 
 // MARK: - Custom Colors for New Design
