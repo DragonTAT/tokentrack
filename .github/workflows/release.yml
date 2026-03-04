@@ -134,10 +134,9 @@ jobs:
           cp apps/TokscaleMac/TokscaleMac/Engine/Pricing/builtin.json "${BUNDLE}/Contents/Resources/"
           cp apps/TokscaleMac/TokscaleMac/Resources/AppIcon.icns "${BUNDLE}/Contents/Resources/"
 
-          cat > "${BUNDLE}/Contents/Info.plist" <<'PLIST_EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
+          echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+          <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+          <plist version=\"1.0\">
           <dict>
             <key>CFBundleName</key><string>TokenTrack</string>
             <key>CFBundleIdentifier</key><string>com.dragontat.tokentrack</string>
@@ -147,15 +146,10 @@ jobs:
             <key>LSMinimumSystemVersion</key><string>14.0</string>
             <key>NSHighResolutionCapable</key><true/>
             <key>LSUIElement</key><true/>
+            <key>CFBundleVersion</key><string>${VERSION}</string>
+            <key>CFBundleShortVersionString</key><string>${VERSION}</string>
           </dict>
-          </plist>
-PLIST_EOF
-
-          # Fix: remove leading whitespace from heredoc (YAML indentation)
-          sed -i '' 's/^          //' "${BUNDLE}/Contents/Info.plist"
-
-          # Inject version dynamically (avoids shell expansion issues with heredoc)
-          sed -i '' "s|</dict>|  <key>CFBundleVersion</key><string>${VERSION}</string>\n  <key>CFBundleShortVersionString</key><string>${VERSION}</string>\n</dict>|" "${BUNDLE}/Contents/Info.plist"
+          </plist>" > "${BUNDLE}/Contents/Info.plist"
 
           echo "── Info.plist ──"
           cat "${BUNDLE}/Contents/Info.plist"
