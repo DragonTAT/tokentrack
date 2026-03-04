@@ -493,7 +493,7 @@ jobs:
           fi
 
           "$SPARKLE_KEYS_BIN" --account ed25519 -f "$KEY_FILE" >/dev/null 2>&1 || true
-          DERIVED_PUBLIC_KEY=$("$SPARKLE_KEYS_BIN" --account ed25519 -p | awk -F': ' '/SUPublicEDKey|Public key/ {print $NF}' | tail -1 | tr -d '\r')
+          DERIVED_PUBLIC_KEY=$("$SPARKLE_KEYS_BIN" --account ed25519 -p | tr -d '\r' | tail -n 1 | tr -d '[:space:]')
           if [ -z "${DERIVED_PUBLIC_KEY:-}" ]; then
             echo "::error::Failed to derive SUPublicEDKey from SPARKLE_ED25519_PRIVATE_KEY"
             exit 1
