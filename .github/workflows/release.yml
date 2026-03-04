@@ -164,14 +164,15 @@ jobs:
             --sign "$SIGNING_IDENTITY" \
             "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
 
-          # Sign resource bundles and dynamic libraries from inside out
+          # Sign dynamic libraries and frameworks from inside out
           if [ -d "dist/${APP_NAME}.app/Contents" ]; then
              # Sign inner dylibs
              find "dist/${APP_NAME}.app/Contents" -type f -name "*.dylib" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
-             # Sign inner frameworks
+             # Sign inner frameworks (if any exist)
              find "dist/${APP_NAME}.app/Contents" -type d -name "*.framework" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
-             # Sign inner bundles
-             find "dist/${APP_NAME}.app/Contents" -type d -name "*.bundle" -exec codesign --force --timestamp --options runtime --sign "$SIGNING_IDENTITY" {} \;
+             # Note: We do NOT explicitly sign .bundle here because SPM resource bundles 
+             # usually don't contain executable binaries and will cause "unrecognized format" errors.
+             # They will be sealed automatically when we sign the outer .app.
           fi
 
           # Sign the app bundle
