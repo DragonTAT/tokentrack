@@ -205,9 +205,35 @@ jobs:
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
           APPLE_NOTARY_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_NOTARY_PRIVATE_KEY_BASE64 }}
         run: |
+          set -euo pipefail
+
+          if [ -z "${APPLE_NOTARY_PRIVATE_KEY_BASE64:-}" ]; then
+            echo "::error::APPLE_NOTARY_PRIVATE_KEY_BASE64 secret is missing"
+            exit 1
+          fi
+          if [ -z "${APPLE_NOTARY_KEY_ID:-}" ]; then
+            echo "::error::APPLE_NOTARY_KEY_ID secret is missing"
+            exit 1
+          fi
+          if [ -z "${APPLE_NOTARY_ISSUER_ID:-}" ]; then
+            echo "::error::APPLE_NOTARY_ISSUER_ID secret is missing"
+            exit 1
+          fi
+
           # Decode the API key
           KEY_PATH="$RUNNER_TEMP/notary_key.p8"
           echo "$APPLE_NOTARY_PRIVATE_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+
+          if [ ! -s "$KEY_PATH" ]; then
+            echo "::error::Decoded notary key is empty"
+            exit 1
+          fi
+          echo "✓ Notary API key prepared"
+
+          if [ ! -f "$DMG_PATH" ]; then
+            echo "::error::DMG file not found at $DMG_PATH"
+            exit 1
+          fi
 
           echo "Submitting DMG for notarization..."
           xcrun notarytool submit "$DMG_PATH" \
