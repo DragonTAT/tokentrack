@@ -30,11 +30,21 @@ jobs:
           set -euo pipefail
 
           version_ge() {
-            # true if $1 >= $2
-            [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+            # true if $1 >= $2, portable on macOS runners
+            python3 - "$1" "$2" <<'PY'
+import sys
+def parse(v):
+    return [int(x) for x in v.split(".") if x != ""]
+a = parse(sys.argv[1])
+b = parse(sys.argv[2])
+n = max(len(a), len(b))
+a += [0] * (n - len(a))
+b += [0] * (n - len(b))
+sys.exit(0 if a >= b else 1)
+PY
           }
 
-          mapfile -t CANDIDATES < <(find /Applications -maxdepth 1 -type d -name 'Xcode*.app' | sort -V)
+          mapfile -t CANDIDATES < <(find /Applications -maxdepth 1 -type d -name 'Xcode*.app' | sort)
           if [ ${#CANDIDATES[@]} -eq 0 ]; then
             echo "::error::No Xcode installation found under /Applications."
             exit 1
@@ -212,7 +222,17 @@ jobs:
           set -euo pipefail
 
           version_ge() {
-            [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+            python3 - "$1" "$2" <<'PY'
+import sys
+def parse(v):
+    return [int(x) for x in v.split(".") if x != ""]
+a = parse(sys.argv[1])
+b = parse(sys.argv[2])
+n = max(len(a), len(b))
+a += [0] * (n - len(a))
+b += [0] * (n - len(b))
+sys.exit(0 if a >= b else 1)
+PY
           }
 
           BIN="apps/TokscaleMac/.build/release/TokscaleMac"
@@ -297,7 +317,17 @@ jobs:
           set -euo pipefail
 
           version_ge() {
-            [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+            python3 - "$1" "$2" <<'PY'
+import sys
+def parse(v):
+    return [int(x) for x in v.split(".") if x != ""]
+a = parse(sys.argv[1])
+b = parse(sys.argv[2])
+n = max(len(a), len(b))
+a += [0] * (n - len(a))
+b += [0] * (n - len(b))
+sys.exit(0 if a >= b else 1)
+PY
           }
 
           BIN="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
