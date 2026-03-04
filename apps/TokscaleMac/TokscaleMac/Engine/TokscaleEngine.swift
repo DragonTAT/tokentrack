@@ -7,10 +7,20 @@ public class TokscaleEngine {
     public func ensurePricingInitialized() async {
         var litellmData = (try? await LiteLLM.fetch()) ?? LiteLLM.loadCachedIgnoreTTL() ?? [:]
         
-        // Merge builtin overrides to handle zero-cost or missing data in LiteLLM cache
+        // Use builtin as fallback for missing or invalid data in LiteLLM
         if let builtin = LiteLLM.loadBuiltin() {
             for (key, pricing) in builtin {
-                litellmData[key] = pricing
+                if let existing = litellmData[key] {
+                    // Only override if existing data has no valid pricing
+                    let hasInput = existing.inputCostPerToken != nil && existing.inputCostPerToken! > 0
+                    let hasOutput = existing.outputCostPerToken != nil && existing.outputCostPerToken! > 0
+                    if !hasInput && !hasOutput {
+                        litellmData[key] = pricing
+                    }
+                } else {
+                    // Key doesn't exist in remote data, use builtin
+                    litellmData[key] = pricing
+                }
             }
         }
         

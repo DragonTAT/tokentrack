@@ -3,36 +3,28 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-RESOURCES_DIR="$SCRIPT_DIR/TokscaleMac/Resources"
 
-echo "═══ TokenTrack macOS App Builder ═══"
+echo "═══ TokenTrack macOS App Builder (Swift Native) ═══"
 echo ""
 
-# Step 1: Build the Rust CLI in release mode
-echo "▸ Building tokscale CLI (release)..."
-cd "$PROJECT_ROOT"
-cargo build --release -p tokscale-cli 2>&1 | tail -3
+# The project has been migrated to a native Swift engine.
+# No need for Rust building or CLI embedding.
 
-CLI_BINARY="$PROJECT_ROOT/target/release/tokscale"
-if [ ! -f "$CLI_BINARY" ]; then
-    echo "✗ Error: tokscale binary not found at $CLI_BINARY"
-    exit 1
+# Step 1: Clean build directory if requested
+if [[ "${1:-}" == "--clean" ]]; then
+    echo "▸ Cleaning build directory..."
+    cd "$SCRIPT_DIR"
+    rm -rf .build
+    echo "  ✓ Cleaned"
 fi
-echo "  ✓ CLI binary ready: $(du -h "$CLI_BINARY" | cut -f1)"
 
-# Step 2: Copy binary into Swift app resources
-echo "▸ Embedding CLI binary into app resources..."
-mkdir -p "$RESOURCES_DIR"
-cp "$CLI_BINARY" "$RESOURCES_DIR/tokscale"
-chmod +x "$RESOURCES_DIR/tokscale"
-echo "  ✓ Copied to $RESOURCES_DIR/tokscale"
-
-# Step 3: Build the Swift app
-echo "▸ Building Swift app..."
+# Step 2: Build the Swift app
+echo "▸ Building Swift app (SwiftPM)..."
 cd "$SCRIPT_DIR"
-swift build 2>&1 | tail -3
+swift build 2>&1 | tail -5
 echo "  ✓ Swift app built"
 
 echo ""
 echo "═══ Build complete! ═══"
 echo "Run: cd $SCRIPT_DIR && .build/debug/TokscaleMac"
+echo "Note: The engine is now natively integrated into the Swift app."

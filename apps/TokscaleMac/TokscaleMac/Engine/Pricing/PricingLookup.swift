@@ -119,7 +119,16 @@ public class PricingLookup {
         }
         cacheLock.unlock()
         
-        return lookupWithSource(modelId: modelId, forceSource: nil)
+        let result = lookupWithSource(modelId: modelId, forceSource: nil)
+        
+        cacheLock.lock()
+        if lookupCache.count >= Self.maxLookupCacheEntries {
+            lookupCache.removeAll()
+        }
+        lookupCache[modelId] = result
+        cacheLock.unlock()
+        
+        return result
     }
     
     public func lookupWithSource(modelId: String, forceSource: String?) -> LookupResult? {

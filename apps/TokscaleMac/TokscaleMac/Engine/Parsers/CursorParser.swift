@@ -86,9 +86,9 @@ public class CursorParser: SessionParser {
             
             let providerId: String
             let lowerModel = model.lowercased()
-            if lowerModel.contains("claude") {
+            if lowerModel.contains("claude") || lowerModel.contains("opus") || lowerModel.contains("sonnet") || lowerModel.contains("haiku") {
                 providerId = "anthropic"
-            } else if lowerModel.contains("gpt") || lowerModel.contains("o1") || lowerModel.contains("o3") {
+            } else if lowerModel.contains("gpt") || lowerModel.contains("o1") || lowerModel.contains("o3") || lowerModel.contains("o4") {
                 providerId = "openai"
             } else if lowerModel.contains("gemini") {
                 providerId = "google"
@@ -96,6 +96,12 @@ public class CursorParser: SessionParser {
                 providerId = "deepseek"
             } else if lowerModel.contains("llama") {
                 providerId = "meta"
+            } else if lowerModel.contains("grok") {
+                providerId = "xai"
+            } else if lowerModel.contains("qwen") {
+                providerId = "alibaba"
+            } else if lowerModel.contains("mistral") {
+                providerId = "mistral"
             } else {
                 providerId = "cursor"
             }

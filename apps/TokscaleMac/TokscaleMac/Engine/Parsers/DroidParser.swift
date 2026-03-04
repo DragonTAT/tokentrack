@@ -71,7 +71,7 @@ public class DroidParser: SessionParser {
                 normalized = String(normalized.dropLast())
             }
             
-            normalized = normalized.lowercased().replacingOccurrences(of: ".", with: "-")
+            normalized = normalized.lowercased()
             
             // Remove consecutive hyphens
             var collapsed = ""

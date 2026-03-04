@@ -194,9 +194,9 @@ public class CodexParser: SessionParser {
         
         guard let usage = usageData else { return nil }
         
-        let inputTokens = (usage["input_tokens"] as? Int64) ?? (usage["prompt_tokens"] as? Int64) ?? (usage["input"] as? Int64) ?? 0
-        let outputTokens = (usage["output_tokens"] as? Int64) ?? (usage["completion_tokens"] as? Int64) ?? (usage["output"] as? Int64) ?? 0
-        let cachedTokens = (usage["cached_input_tokens"] as? Int64) ?? (usage["cache_read_input_tokens"] as? Int64) ?? (usage["cached_tokens"] as? Int64) ?? 0
+        let inputTokens = (usage["input_tokens"] as? NSNumber)?.int64Value ?? (usage["prompt_tokens"] as? NSNumber)?.int64Value ?? (usage["input"] as? NSNumber)?.int64Value ?? 0
+        let outputTokens = (usage["output_tokens"] as? NSNumber)?.int64Value ?? (usage["completion_tokens"] as? NSNumber)?.int64Value ?? (usage["output"] as? NSNumber)?.int64Value ?? 0
+        let cachedTokens = (usage["cached_input_tokens"] as? NSNumber)?.int64Value ?? (usage["cache_read_input_tokens"] as? NSNumber)?.int64Value ?? (usage["cached_tokens"] as? NSNumber)?.int64Value ?? 0
         
         let modelFromDict = (dict["model"] as? String) ?? (dict["model_name"] as? String) ??
                             ((dict["data"] as? [String: Any])?["model"] as? String) ??

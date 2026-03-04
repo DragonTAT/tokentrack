@@ -11,7 +11,7 @@ fileprivate class DayAccumulator {
         let totalTokens = msg.tokens.input + msg.tokens.output + msg.tokens.cacheRead + msg.tokens.cacheWrite + msg.tokens.reasoning
         
         totals.tokens += totalTokens
-        totals.cost += msg.cost ?? 0.0
+        totals.cost += msg.cost
         totals.messages += 1
         
         tokenBreakdown.input += msg.tokens.input
@@ -46,7 +46,7 @@ fileprivate class DayAccumulator {
         clientEntry.tokens.cacheRead += msg.tokens.cacheRead
         clientEntry.tokens.cacheWrite += msg.tokens.cacheWrite
         clientEntry.tokens.reasoning += msg.tokens.reasoning
-        clientEntry.cost += msg.cost ?? 0.0
+        clientEntry.cost += msg.cost
         clientEntry.messages += 1
         
         let providers = Array(Set(clientEntry.providerId.components(separatedBy: ", "))).sorted()

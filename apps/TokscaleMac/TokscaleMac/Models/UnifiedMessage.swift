@@ -36,7 +36,7 @@ public struct UnifiedMessage: Codable, Equatable {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000.0)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(abbreviation: "UTC")
+        formatter.timeZone = .current
         self.date = formatter.string(from: date)
     }
 }
