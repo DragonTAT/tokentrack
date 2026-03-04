@@ -54,6 +54,7 @@ struct DashboardView: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
+            .background(.regularMaterial) // Let Sidebar show macOS Blur
             
         } detail: {
             // MARK: - Detail Content Area
@@ -76,7 +77,7 @@ struct DashboardView: View {
                 // Footer (status bar)
                 footerBar
             }
-            .background(Color(NSColor.windowBackgroundColor)) // Native macOS background
+            .background(.regularMaterial) // macOS native glassmorphism / translucent blur
         }
         .preferredColorScheme(.dark)
         .task { await store.refreshAll() }
@@ -171,7 +172,7 @@ struct DashboardView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(.regularMaterial)
+            .background(.ultraThinMaterial) // Layer thin blur over the regular material background
         }
     }
 
