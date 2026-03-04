@@ -31,17 +31,7 @@ jobs:
 
           version_ge() {
             # true if $1 >= $2, portable on macOS runners
-            python3 - "$1" "$2" <<'PY'
-import sys
-def parse(v):
-    return [int(x) for x in v.split(".") if x != ""]
-a = parse(sys.argv[1])
-b = parse(sys.argv[2])
-n = max(len(a), len(b))
-a += [0] * (n - len(a))
-b += [0] * (n - len(b))
-sys.exit(0 if a >= b else 1)
-PY
+            python3 -c 'import sys; p=lambda v:[int(x) for x in v.split(".") if x]; a,b=p(sys.argv[1]),p(sys.argv[2]); n=max(len(a),len(b)); a+=[0]*(n-len(a)); b+=[0]*(n-len(b)); sys.exit(0 if a>=b else 1)' "$1" "$2"
           }
 
           mapfile -t CANDIDATES < <(find /Applications -maxdepth 1 -type d -name 'Xcode*.app' | sort)
@@ -222,17 +212,7 @@ PY
           set -euo pipefail
 
           version_ge() {
-            python3 - "$1" "$2" <<'PY'
-import sys
-def parse(v):
-    return [int(x) for x in v.split(".") if x != ""]
-a = parse(sys.argv[1])
-b = parse(sys.argv[2])
-n = max(len(a), len(b))
-a += [0] * (n - len(a))
-b += [0] * (n - len(b))
-sys.exit(0 if a >= b else 1)
-PY
+            python3 -c 'import sys; p=lambda v:[int(x) for x in v.split(".") if x]; a,b=p(sys.argv[1]),p(sys.argv[2]); n=max(len(a),len(b)); a+=[0]*(n-len(a)); b+=[0]*(n-len(b)); sys.exit(0 if a>=b else 1)' "$1" "$2"
           }
 
           BIN="apps/TokscaleMac/.build/release/TokscaleMac"
@@ -317,17 +297,7 @@ PY
           set -euo pipefail
 
           version_ge() {
-            python3 - "$1" "$2" <<'PY'
-import sys
-def parse(v):
-    return [int(x) for x in v.split(".") if x != ""]
-a = parse(sys.argv[1])
-b = parse(sys.argv[2])
-n = max(len(a), len(b))
-a += [0] * (n - len(a))
-b += [0] * (n - len(b))
-sys.exit(0 if a >= b else 1)
-PY
+            python3 -c 'import sys; p=lambda v:[int(x) for x in v.split(".") if x]; a,b=p(sys.argv[1]),p(sys.argv[2]); n=max(len(a),len(b)); a+=[0]*(n-len(a)); b+=[0]*(n-len(b)); sys.exit(0 if a>=b else 1)' "$1" "$2"
           }
 
           BIN="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
