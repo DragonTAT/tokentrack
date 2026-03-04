@@ -440,6 +440,7 @@ jobs:
       - name: Generate Sparkle appcast
         env:
           SPARKLE_ED25519_KEY: ${{ secrets.SPARKLE_ED25519_PRIVATE_KEY }}
+          SPARKLE_ED25519_PUBLIC_KEY: ${{ secrets.SPARKLE_ED25519_PUBLIC_KEY }}
         run: |
           set -euo pipefail
 
@@ -470,6 +471,38 @@ jobs:
           KEY_FILE="$RUNNER_TEMP/sparkle_ed25519.key"
           printf '%s' "$SPARKLE_ED25519_KEY" > "$KEY_FILE"
           chmod 600 "$KEY_FILE"
+
+          if [ -z "${SPARKLE_ED25519_PUBLIC_KEY:-}" ]; then
+            echo "::error::SPARKLE_ED25519_PUBLIC_KEY secret is missing"
+            exit 1
+          fi
+
+          # Proactively validate that public/private secrets are a matching pair.
+          SPARKLE_KEYS_BIN=$(find ~/Library/Developer -name generate_keys -type f 2>/dev/null | head -1 || true)
+          if [ -z "$SPARKLE_KEYS_BIN" ] && [ -x "/tmp/sparkle/bin/generate_keys" ]; then
+            SPARKLE_KEYS_BIN="/tmp/sparkle/bin/generate_keys"
+          fi
+
+          if [ -z "$SPARKLE_KEYS_BIN" ]; then
+            echo "::error::generate_keys not found; cannot validate Sparkle key pair"
+            exit 1
+          fi
+
+          if [ ! -x "$SPARKLE_KEYS_BIN" ]; then
+            chmod +x "$SPARKLE_KEYS_BIN"
+          fi
+
+          "$SPARKLE_KEYS_BIN" --account ed25519 -f "$KEY_FILE" >/dev/null 2>&1 || true
+          DERIVED_PUBLIC_KEY=$("$SPARKLE_KEYS_BIN" --account ed25519 -p | awk -F': ' '/SUPublicEDKey|Public key/ {print $NF}' | tail -1 | tr -d '\r')
+          if [ -z "${DERIVED_PUBLIC_KEY:-}" ]; then
+            echo "::error::Failed to derive SUPublicEDKey from SPARKLE_ED25519_PRIVATE_KEY"
+            exit 1
+          fi
+
+          if [ "$DERIVED_PUBLIC_KEY" != "$SPARKLE_ED25519_PUBLIC_KEY" ]; then
+            echo "::error::SPARKLE_ED25519_PUBLIC_KEY does not match the private key. Update secret value to: $DERIVED_PUBLIC_KEY"
+            exit 1
+          fi
 
           # Generate appcast.xml (signs with EdDSA key from env var)
           "$SPARKLE_BIN" dist/appcast_input/ -o dist/appcast.xml \
