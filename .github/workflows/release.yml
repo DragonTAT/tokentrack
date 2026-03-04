@@ -34,8 +34,8 @@ jobs:
             python3 -c 'import sys; p=lambda v:[int(x) for x in v.split(".") if x]; a,b=p(sys.argv[1]),p(sys.argv[2]); n=max(len(a),len(b)); a+=[0]*(n-len(a)); b+=[0]*(n-len(b)); sys.exit(0 if a>=b else 1)' "$1" "$2"
           }
 
-          mapfile -t CANDIDATES < <(find /Applications -maxdepth 1 -type d -name 'Xcode*.app' | sort)
-          if [ ${#CANDIDATES[@]} -eq 0 ]; then
+          CANDIDATE_COUNT="$(find /Applications -maxdepth 1 -type d -name 'Xcode*.app' | wc -l | tr -d ' ')"
+          if [ "${CANDIDATE_COUNT:-0}" = "0" ]; then
             echo "::error::No Xcode installation found under /Applications."
             exit 1
           fi
@@ -47,7 +47,7 @@ jobs:
           FALLBACK_SDK_VER=""
 
           echo "Detected Xcode candidates:"
-          for app in "${CANDIDATES[@]}"; do
+          while IFS= read -r app; do
             dev_dir="$app/Contents/Developer"
             if [ ! -d "$dev_dir" ]; then
               continue
@@ -73,7 +73,7 @@ jobs:
               FALLBACK_XCODE_VER="$xcode_ver"
               FALLBACK_SDK_VER="$sdk_ver"
             fi
-          done
+          done < <(find /Applications -maxdepth 1 -type d -name 'Xcode*.app' | sort)
 
           SELECTED_APP=""
           SELECTED_XCODE_VER=""
