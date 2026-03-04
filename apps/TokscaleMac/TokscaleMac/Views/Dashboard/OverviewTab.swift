@@ -17,23 +17,42 @@ struct OverviewTab: View {
         } else {
             GeometryReader { geo in
                 let chartHeight = max(geo.size.height * 0.35, 100)
-                VStack(spacing: 0) {
-                    // Stacked bar chart
-                    StackedBarChart(sortField: sortField, selectedDate: $selectedDate)
-                        .frame(height: chartHeight)
-                        .padding(.horizontal, 4)
-
-                    // Legend
-                    legendRow
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-
-                    // Top models list (filtered by selected date if any)
-                    if let date = selectedDate {
-                        dayModelsList(date: date)
-                    } else {
-                        topModelsList
+                VStack(spacing: 16) {
+                    
+                    // MARK: - Chart Card
+                    VStack(spacing: 12) {
+                        // Header: Title + Legend
+                        HStack {
+                            Text("Usage Trend (Last 60 Days)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(theme.secondaryForeground)
+                            
+                            Spacer()
+                            
+                            legendRow
+                        }
+                        
+                        // Stacked bar chart
+                        StackedBarChart(sortField: sortField, selectedDate: $selectedDate)
+                            .frame(height: chartHeight)
                     }
+                    .padding(16)
+                    .background(theme.panelBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.border, lineWidth: 1))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+
+                    // MARK: - Top models list (filtered by selected date if any)
+                    Group {
+                        if let date = selectedDate {
+                            dayModelsList(date: date)
+                        } else {
+                            topModelsList
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
                 }
             }
         }
@@ -51,7 +70,6 @@ struct OverviewTab: View {
                         .foregroundStyle(theme.foreground)
                 }
             }
-            Spacer()
         }
     }
 
