@@ -31,6 +31,7 @@ enum SortDirection {
 
 /// Main dashboard window with a modern macOS native sidebar navigation.
 struct DashboardView: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     @State private var currentTab: DashboardTab = .overview
     @State private var sortField: SortField = .cost
@@ -43,7 +44,7 @@ struct DashboardView: View {
             List(selection: $currentTab) {
                 Text("TokenTrack")
                     .font(.headline)
-                    .foregroundStyle(store.currentTheme.accent)
+                    .foregroundStyle(theme.accent)
                     .padding(.vertical, 8)
                 
                 ForEach(DashboardTab.allCases) { tab in
@@ -54,7 +55,7 @@ struct DashboardView: View {
                 }
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
-            .background(.regularMaterial) // Let Sidebar show macOS Blur
+            .background(theme.panelBackground) // Theme background for sidebar
             
         } detail: {
             // MARK: - Detail Content Area
@@ -77,9 +78,10 @@ struct DashboardView: View {
                 // Footer (status bar)
                 footerBar
             }
-            .background(.regularMaterial) // macOS native glassmorphism / translucent blur
+            .background(theme.background) // Theme background for detailed view
+            .foregroundStyle(theme.foreground) // Added foreground style as a fallback for the detail view
         }
-        .preferredColorScheme(.dark)
+        // Remove forced dark mode and rely on injected environment
         .task { await store.refreshAll() }
         .toolbar {
             // Adds a refresh button to the native toolbar
@@ -97,6 +99,7 @@ struct DashboardView: View {
                 .disabled(refreshing)
             }
         }
+        .foregroundStyle(theme.foreground)
     }
 
     // MARK: - Footer
@@ -163,16 +166,16 @@ struct DashboardView: View {
                     Spacer()
                     
                     Button(action: { store.cycleTheme() }) {
-                        Label(store.currentTheme.name.displayName, systemImage: "paintpalette.fill")
+                        Label(theme.name.displayName, systemImage: "paintpalette.fill")
                             .font(.system(size: 11))
-                            .foregroundStyle(store.currentTheme.accent)
+                            .foregroundStyle(theme.accent)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(.ultraThinMaterial) // Layer thin blur over the regular material background
+            .background(theme.stripedRow) // Footer background mapped to stripeRow style
         }
     }
 

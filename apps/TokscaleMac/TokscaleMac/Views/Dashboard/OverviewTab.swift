@@ -3,6 +3,7 @@ import SwiftUI
 /// Overview tab: stacked bar chart (top 35%) + legend + top models list.
 /// When a bar is clicked, shows only that day's model usage.
 struct OverviewTab: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     @Binding var sortField: SortField
     @Binding var sortDirection: SortDirection
@@ -11,7 +12,7 @@ struct OverviewTab: View {
     var body: some View {
         if store.isLoading && store.modelReport == nil {
             ProgressView("Loading...")
-                .foregroundStyle(AppColors.muted)
+                .foregroundStyle(theme.secondaryForeground)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             GeometryReader { geo in
@@ -47,7 +48,7 @@ struct OverviewTab: View {
                     Circle().fill(AppColors.modelColor(m.model)).frame(width: 6, height: 6)
                     Text(truncate(m.model, max: 18))
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(AppColors.foreground)
+                        .foregroundStyle(theme.foreground)
                 }
             }
             Spacer()
@@ -63,10 +64,10 @@ struct OverviewTab: View {
             HStack {
                 Text(" \(date) ")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(store.currentTheme.accent)
+                    .foregroundStyle(theme.accent)
                 Text("(\(dayModels.count) models)")
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(AppColors.muted)
+                    .foregroundStyle(theme.secondaryForeground)
                 Spacer()
                 let totalCost = dayModels.reduce(0) { $0 + $1.cost }
                 Text(Formatting.formatCost(totalCost))
@@ -75,13 +76,13 @@ struct OverviewTab: View {
                 Text("  ")
                 Button("✕") { selectedDate = nil }
                     .buttonStyle(.plain)
-                    .foregroundStyle(AppColors.muted)
+                    .foregroundStyle(theme.secondaryForeground)
                     .font(.system(size: 12, design: .monospaced))
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(AppColors.background)
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
+            .background(theme.panelBackground)
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.border, lineWidth: 1))
 
             // Day model rows
             ScrollView {
@@ -98,8 +99,8 @@ struct OverviewTab: View {
                                     .foregroundStyle(AppColors.modelColor(model.modelId))
                                 Text(String(format: "(%.1f%%)", percentage))
                                     .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(AppColors.muted)
-                                Text("·").foregroundStyle(AppColors.border)
+                                    .foregroundStyle(theme.secondaryForeground)
+                                Text("·").foregroundStyle(theme.border)
                                 Text(AppColors.clientDisplayName(model.client))
                                     .font(.system(size: 11, design: .monospaced))
                                     .foregroundStyle(AppColors.clientColor(model.client))
@@ -110,25 +111,25 @@ struct OverviewTab: View {
                             }
                             // Line 2: In/Out/CR/CW
                             HStack(spacing: 0) {
-                                Text("  In: ").foregroundStyle(Color(white: 0.4))
-                                Text(Formatting.formatTokens(model.tokens.input)).foregroundStyle(Color(white: 0.67))
-                                Text(" · Out: ").foregroundStyle(Color(white: 0.4))
-                                Text(Formatting.formatTokens(model.tokens.output)).foregroundStyle(Color(white: 0.67))
-                                Text(" · CR: ").foregroundStyle(Color(white: 0.4))
-                                Text(Formatting.formatTokens(model.tokens.cacheRead)).foregroundStyle(Color(white: 0.67))
-                                Text(" · CW: ").foregroundStyle(Color(white: 0.4))
-                                Text(Formatting.formatTokens(model.tokens.cacheWrite)).foregroundStyle(Color(white: 0.67))
+                                Text("  In: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.tokens.input)).foregroundStyle(theme.foreground)
+                                Text(" · Out: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.tokens.output)).foregroundStyle(theme.foreground)
+                                Text(" · CR: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.tokens.cacheRead)).foregroundStyle(theme.foreground)
+                                Text(" · CW: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.tokens.cacheWrite)).foregroundStyle(theme.foreground)
                                 Spacer()
                             }
                             .font(.system(size: 11, design: .monospaced))
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(idx % 2 == 1 ? AppColors.stripedRow : .clear)
+                        .background(idx % 2 == 1 ? theme.stripedRow : .clear)
                     }
                 }
             }
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.border, lineWidth: 1))
         }
     }
 
@@ -142,7 +143,7 @@ struct OverviewTab: View {
             HStack {
                 Text(sortField == .tokens ? " Models by Tokens " : " Models by Cost ")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(store.currentTheme.accent)
+                    .foregroundStyle(theme.accent)
                 Spacer()
                 Text("Total: \(Formatting.formatCost(totalCost))")
                     .font(.system(size: 12, design: .monospaced))
@@ -150,8 +151,8 @@ struct OverviewTab: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(AppColors.background)
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
+            .background(theme.panelBackground)
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.border, lineWidth: 1))
 
             // Model rows
             ScrollView {
@@ -166,32 +167,32 @@ struct OverviewTab: View {
                                     .foregroundStyle(AppColors.modelColor(model.model))
                                 Text(String(format: "(%.1f%%)", percentage))
                                     .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(AppColors.muted)
+                                    .foregroundStyle(theme.secondaryForeground)
                                 Spacer()
                                 Text(Formatting.formatCost(model.cost))
                                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                                     .foregroundStyle(.green)
                             }
                             HStack(spacing: 0) {
-                                Text("  In: ").foregroundStyle(Color(white: 0.4))
-                                Text(Formatting.formatTokens(model.input)).foregroundStyle(Color(white: 0.67))
-                                Text(" · Out: ").foregroundStyle(Color(white: 0.4))
-                                Text(Formatting.formatTokens(model.output)).foregroundStyle(Color(white: 0.67))
-                                Text(" · CR: ").foregroundStyle(Color(white: 0.4))
-                                Text(Formatting.formatTokens(model.cacheRead)).foregroundStyle(Color(white: 0.67))
-                                Text(" · CW: ").foregroundStyle(Color(white: 0.4))
-                                Text(Formatting.formatTokens(model.cacheWrite)).foregroundStyle(Color(white: 0.67))
+                                Text("  In: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.input)).foregroundStyle(theme.foreground)
+                                Text(" · Out: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.output)).foregroundStyle(theme.foreground)
+                                Text(" · CR: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.cacheRead)).foregroundStyle(theme.foreground)
+                                Text(" · CW: ").foregroundStyle(theme.secondaryForeground)
+                                Text(Formatting.formatTokens(model.cacheWrite)).foregroundStyle(theme.foreground)
                                 Spacer()
                             }
                             .font(.system(size: 11, design: .monospaced))
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(idx % 2 == 1 ? AppColors.stripedRow : .clear)
+                        .background(idx % 2 == 1 ? theme.stripedRow : .clear)
                     }
                 }
             }
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.border, lineWidth: 1))
         }
     }
 

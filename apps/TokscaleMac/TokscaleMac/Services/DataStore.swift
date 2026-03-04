@@ -14,9 +14,7 @@ final class DataStore {
     var error: String?
     var lastRefresh: Date?
 
-    var currentTheme: Theme {
-        .from(AppSettings.shared.themeName)
-    }
+    var currentTheme: Theme = .from(AppSettings.shared.themeName)
 
     // Stats derived from graph
     var currentStreak: Int = 0
@@ -79,6 +77,12 @@ final class DataStore {
 
     func cycleTheme() {
         AppSettings.shared.themeName = AppSettings.shared.themeName.next
+        currentTheme = .from(AppSettings.shared.themeName)
+    }
+
+    func setTheme(_ name: ThemeName) {
+        AppSettings.shared.themeName = name
+        currentTheme = .from(name)
     }
 
     // MARK: - Period Summary (today / week / month)

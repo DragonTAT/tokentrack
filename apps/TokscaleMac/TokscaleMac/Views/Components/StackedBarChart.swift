@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Stacked bar chart showing daily token usage by model (last 60 days).
 struct StackedBarChart: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     let sortField: SortField
     @Binding var selectedDate: String?
@@ -31,7 +32,7 @@ struct StackedBarChart: View {
                     context.draw(
                         Text(label)
                             .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(AppColors.muted),
+                            .foregroundStyle(theme.secondaryForeground),
                         at: CGPoint(x: leftPadding - 6, y: y),
                         anchor: .trailing
                     )
@@ -41,7 +42,7 @@ struct StackedBarChart: View {
                         var path = Path()
                         path.move(to: CGPoint(x: leftPadding, y: y))
                         path.addLine(to: CGPoint(x: leftPadding + chartWidth, y: y))
-                        context.stroke(path, with: .color(AppColors.border.opacity(0.3)), lineWidth: 0.5)
+                        context.stroke(path, with: .color(theme.border.opacity(0.5)), lineWidth: 0.5)
                     }
                 }
 
@@ -56,7 +57,7 @@ struct StackedBarChart: View {
                         let bgRect = CGRect(x: x - 1, y: 4, width: barWidth + 2, height: chartHeight)
                         context.fill(
                             Rectangle().path(in: bgRect),
-                            with: .color(AppColors.selection.opacity(0.5))
+                            with: .color(theme.selection.opacity(0.8))
                         )
                     }
 
@@ -88,7 +89,7 @@ struct StackedBarChart: View {
                         context.draw(
                             Text(label)
                                 .font(.system(size: 8, design: .monospaced))
-                                .foregroundStyle(AppColors.muted),
+                                .foregroundStyle(theme.secondaryForeground),
                             at: CGPoint(x: x, y: y),
                             anchor: .center
                         )

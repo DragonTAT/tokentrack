@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Daily usage tab using native macOS Table for proper column resizing and sorting behavior.
 struct DailyTab: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     @Binding var sortField: SortField
     @Binding var sortDirection: SortDirection
@@ -31,7 +32,7 @@ struct DailyTab: View {
                 .tableStyle(.inset) // Standard macOS Table style
                 .font(.system(size: 12)) // Slightly larger than before for better readability natively
                 // Setting a background on the table container keeps it consistent with macOS aesthetics
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(theme.panelBackground)
             }
         }
     }

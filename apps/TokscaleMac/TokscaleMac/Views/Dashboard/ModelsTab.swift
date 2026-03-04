@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Models tab using native macOS Table for proper column resizing and sorting behavior.
 struct ModelsTab: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     @Binding var sortField: SortField
     @Binding var sortDirection: SortDirection
@@ -30,7 +31,7 @@ struct ModelsTab: View {
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .tableStyle(.inset)
                 .font(.system(size: 12))
-                .background(Color(NSColor.controlBackgroundColor))
+                .background(theme.panelBackground)
             }
         }
     }

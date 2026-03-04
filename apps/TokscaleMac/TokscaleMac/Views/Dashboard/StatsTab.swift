@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Stats tab: 52-week contribution graph (top) + stats/breakdown panel (bottom).
 struct StatsTab: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     @State private var selectedCell: (week: Int, day: Int)? = nil
 
@@ -12,12 +13,12 @@ struct StatsTab: View {
                 HStack {
                     Text(" Contribution Graph (52 weeks) ")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(store.currentTheme.accent)
+                        .foregroundStyle(theme.accent)
                     Spacer()
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .overlay(alignment: .bottom) { Rectangle().fill(AppColors.border).frame(height: 1) }
+                .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
 
                 ScrollViewReader { scrollProxy in
                     ScrollView(.horizontal, showsIndicators: true) {
@@ -39,7 +40,7 @@ struct StatsTab: View {
                     }
                 }
             }
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.border, lineWidth: 1))
             .frame(maxHeight: .infinity)
             .padding(4)
 
@@ -80,11 +81,11 @@ struct StatsTab: View {
             HStack {
                 Text(" Stats ")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(store.currentTheme.accent)
+                    .foregroundStyle(theme.accent)
                 Spacer()
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
-            .overlay(alignment: .bottom) { Rectangle().fill(AppColors.border).frame(height: 1) }
+            .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
 
             VStack(alignment: .leading, spacing: 2) {
                 // Row 1
@@ -109,14 +110,14 @@ struct StatsTab: View {
 
                 // Legend
                 HStack(spacing: 4) {
-                    Text("Less").font(.system(size: 11, design: .monospaced)).foregroundStyle(AppColors.muted)
-                    Text("·").foregroundStyle(Color(white: 0.4))
+                    Text("Less").font(.system(size: 11, design: .monospaced)).foregroundStyle(theme.secondaryForeground)
+                    Text("·").foregroundStyle(theme.border)
                     ForEach(1..<5) { i in
                         RoundedRectangle(cornerRadius: 2)
                             .fill(store.currentTheme.colors[i])
                             .frame(width: 12, height: 12)
                     }
-                    Text("More").font(.system(size: 11, design: .monospaced)).foregroundStyle(AppColors.muted)
+                    Text("More").font(.system(size: 11, design: .monospaced)).foregroundStyle(theme.secondaryForeground)
                 }
 
                 Spacer().frame(height: 8)
@@ -129,12 +130,12 @@ struct StatsTab: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
         }
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.border, lineWidth: 1))
     }
 
     private func statLine(_ label: String, value: String, color: Color, maxW: CGFloat?) -> some View {
         HStack(spacing: 4) {
-            Text(label).foregroundStyle(AppColors.muted)
+            Text(label).foregroundStyle(theme.secondaryForeground)
             Text(value).foregroundStyle(color)
             if maxW != nil { Spacer() }
         }
@@ -148,17 +149,17 @@ struct StatsTab: View {
             HStack {
                 Text(" Day Breakdown ")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(store.currentTheme.accent)
+                    .foregroundStyle(theme.accent)
                 Spacer()
                 Button("✕ Close") {
                     selectedCell = nil
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(AppColors.muted)
+                .foregroundStyle(theme.secondaryForeground)
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
-            .overlay(alignment: .bottom) { Rectangle().fill(AppColors.border).frame(height: 1) }
+            .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
@@ -170,7 +171,7 @@ struct StatsTab: View {
                         HStack(spacing: 12) {
                             Text(day.date)
                                 .font(.system(size: 13, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(theme.foreground)
                             Text(Formatting.formatTokens(day.tokens))
                                 .font(.system(size: 12, design: .monospaced))
                                 .foregroundStyle(.cyan)
@@ -190,7 +191,7 @@ struct StatsTab: View {
                                     .fontWeight(.bold)
                                     .foregroundStyle(AppColors.clientColor(client))
                                 Text("(\(models.count) model\(models.count > 1 ? "s" : ""))")
-                                    .foregroundStyle(AppColors.muted)
+                                    .foregroundStyle(theme.secondaryForeground)
                             }
                             .font(.system(size: 12, design: .monospaced))
 
@@ -199,17 +200,17 @@ struct StatsTab: View {
                                     HStack(spacing: 4) {
                                         Text("  ")
                                         Circle().fill(AppColors.modelColor(m.modelId)).frame(width: 6, height: 6)
-                                        Text(m.modelId).foregroundStyle(.white)
+                                        Text(m.modelId).foregroundStyle(theme.foreground)
                                     }
                                     HStack(spacing: 0) {
-                                        Text("    In: ").foregroundStyle(Color(white: 0.4))
-                                        Text(Formatting.formatTokens(m.tokens.input)).foregroundStyle(Color(white: 0.67))
-                                        Text(" · Out: ").foregroundStyle(Color(white: 0.4))
-                                        Text(Formatting.formatTokens(m.tokens.output)).foregroundStyle(Color(white: 0.67))
-                                        Text(" · CR: ").foregroundStyle(Color(white: 0.4))
-                                        Text(Formatting.formatTokens(m.tokens.cacheRead)).foregroundStyle(Color(white: 0.67))
-                                        Text(" · CW: ").foregroundStyle(Color(white: 0.4))
-                                        Text(Formatting.formatTokens(m.tokens.cacheWrite)).foregroundStyle(Color(white: 0.67))
+                                        Text("    In: ").foregroundStyle(theme.secondaryForeground)
+                                        Text(Formatting.formatTokens(m.tokens.input)).foregroundStyle(theme.foreground)
+                                        Text(" · Out: ").foregroundStyle(theme.secondaryForeground)
+                                        Text(Formatting.formatTokens(m.tokens.output)).foregroundStyle(theme.foreground)
+                                        Text(" · CR: ").foregroundStyle(theme.secondaryForeground)
+                                        Text(Formatting.formatTokens(m.tokens.cacheRead)).foregroundStyle(theme.foreground)
+                                        Text(" · CW: ").foregroundStyle(theme.secondaryForeground)
+                                        Text(Formatting.formatTokens(m.tokens.cacheWrite)).foregroundStyle(theme.foreground)
                                     }
                                 }
                                 .font(.system(size: 11, design: .monospaced))
@@ -218,13 +219,13 @@ struct StatsTab: View {
                     } else {
                         Text("No data for this day")
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(AppColors.muted)
+                            .foregroundStyle(theme.secondaryForeground)
                     }
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
             }
         }
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(AppColors.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.border, lineWidth: 1))
     }
 }

@@ -11,6 +11,14 @@ final class AppSettings {
         case themeName = "tt_themeName"
         case useUTC = "tt_useUTC"
         case autoCheckUpdates = "tt_autoCheckUpdates"
+        case appearance = "tt_appearance"
+    }
+
+    enum AppAppearance: String, CaseIterable, Identifiable {
+        case system = "System"
+        case light = "Light"
+        case dark = "Dark"
+        var id: String { rawValue }
     }
 
     // MARK: - Properties
@@ -25,6 +33,20 @@ final class AppSettings {
 
     var autoCheckUpdates: Bool {
         didSet { UserDefaults.standard.set(autoCheckUpdates, forKey: Key.autoCheckUpdates.rawValue) }
+    }
+
+    var appearance: AppAppearance {
+        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: Key.appearance.rawValue) }
+    }
+
+    // MARK: - Computed
+
+    var colorScheme: ColorScheme? {
+        switch appearance {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
     }
 
     // MARK: - Computed
@@ -45,7 +67,7 @@ final class AppSettings {
            let theme = ThemeName(rawValue: raw) {
             themeName = theme
         } else {
-            themeName = .blue
+            themeName = .vscode
         }
 
         // Default to local time (more intuitive for most users)
@@ -59,6 +81,13 @@ final class AppSettings {
             autoCheckUpdates = defaults.bool(forKey: Key.autoCheckUpdates.rawValue)
         } else {
             autoCheckUpdates = true
+        }
+
+        if let raw = defaults.string(forKey: Key.appearance.rawValue),
+           let appApp = AppAppearance(rawValue: raw) {
+            appearance = appApp
+        } else {
+            appearance = .system
         }
     }
 }

@@ -3,6 +3,7 @@ import Sparkle
 
 /// Settings window with Theme, Time Zone, and Update sections.
 struct SettingsView: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     @State private var settings = AppSettings.shared
 
@@ -37,8 +38,19 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    // MARK: - Appearance
-                    settingsSection(title: "Appearance", icon: "paintpalette.fill") {
+                    // MARK: - Appearance Mode
+                    settingsSection(title: "Mode", icon: "moon.fill") {
+                        Picker("", selection: Bindable(settings).appearance) {
+                            ForEach(AppSettings.AppAppearance.allCases) { app in
+                                Text(app.rawValue).tag(app)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+
+                    // MARK: - Selected Theme
+                    settingsSection(title: "Accent & Theme", icon: "paintpalette.fill") {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Theme")
                                 .font(.system(size: 13, weight: .medium))
@@ -120,20 +132,21 @@ struct SettingsView: View {
                 .padding(24)
             }
         }
-        .frame(width: 420, height: 520)
-        .background(.regularMaterial)
-        .preferredColorScheme(.dark)
+        .frame(width: 420, height: 600)
+        .background(theme.background)
+        .preferredColorScheme(settings.colorScheme)
+        .foregroundStyle(theme.foreground)
     }
 
     // MARK: - Theme Card
 
-    private func themeCard(_ theme: ThemeName) -> some View {
-        let isSelected = settings.themeName == theme
-        let themeObj = Theme.from(theme)
+    private func themeCard(_ themeParam: ThemeName) -> some View {
+        let isSelected = settings.themeName == themeParam
+        let themeObj = Theme.from(themeParam)
 
         return Button(action: {
             withAnimation(.easeInOut(duration: 0.2)) {
-                settings.themeName = theme
+                store.setTheme(themeParam)
             }
         }) {
             VStack(spacing: 6) {
@@ -147,12 +160,12 @@ struct SettingsView: View {
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 4))
 
-                Text(theme.displayName)
+                Text(themeParam.displayName)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? .primary : .secondary)
             }
             .padding(8)
-            .background(isSelected ? Color.white.opacity(0.1) : Color.clear)
+            .background(isSelected ? theme.selection : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -173,7 +186,7 @@ struct SettingsView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.04))
+        .background(theme.panelBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 

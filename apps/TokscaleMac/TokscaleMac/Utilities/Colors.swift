@@ -1,13 +1,9 @@
 import SwiftUI
 
 enum AppColors {
-    // MARK: - Base Theme Colors (GitHub dark)
-    static let background = Color(red: 13/255, green: 17/255, blue: 23/255)
-    static let foreground = Color(red: 201/255, green: 209/255, blue: 217/255)
-    static let border = Color(red: 48/255, green: 54/255, blue: 61/255)
-    static let muted = Color(red: 139/255, green: 148/255, blue: 158/255)
-    static let selection = Color(red: 48/255, green: 54/255, blue: 61/255)
-    static let stripedRow = Color(red: 20/255, green: 24/255, blue: 30/255)
+    // Environment-dependent colors have been moved to Theme.
+    // This file only contains static branded/semantic colors.
+
 
     // MARK: - Token Type Colors
     static let inputTokens = Color(red: 100/255, green: 200/255, blue: 100/255)

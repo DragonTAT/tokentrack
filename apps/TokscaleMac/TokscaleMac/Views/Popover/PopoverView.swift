@@ -7,20 +7,11 @@ enum TimePeriod: String, CaseIterable {
     case all = "All"
 }
 
-// MARK: - Custom Colors for New Design
-enum PopoverColors {
-    static let bg = Color(white: 0.12)
-    static let panelBg = Color(white: 0.16)
-    static let textMain = Color.white
-    static let textSecondary = Color(white: 0.6)
-    static let greenAccent = Color(red: 52/255, green: 199/255, blue: 89/255) // vibrant green
-    static let segmentedBg = Color(white: 0.18)
-    static let segmentedSelected = Color(white: 0.35)
-    static let divider = Color(white: 0.25)
-}
+// Used previously, now deleted in favor of dynamic theme.
 
 /// Compact menu bar popover matching the new native design mockup.
 struct PopoverView: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     @Environment(\.openWindow) private var openWindow
     @State private var period: TimePeriod = .today
@@ -31,7 +22,7 @@ struct PopoverView: View {
             HStack {
                 Text("TokenTrack")
                     .font(.system(size: 13, weight: .semibold, design: .default))
-                    .foregroundStyle(PopoverColors.textMain)
+                    .foregroundStyle(theme.foreground)
                 
                 Spacer(minLength: 4)
                 
@@ -41,25 +32,25 @@ struct PopoverView: View {
                         Button(action: { period = p }) {
                             Text(p.rawValue)
                                 .font(.system(size: 10, weight: period == p ? .semibold : .regular))
-                                .foregroundStyle(period == p ? PopoverColors.textMain : PopoverColors.textSecondary)
+                                .foregroundStyle(period == p ? theme.foreground : theme.secondaryForeground)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
-                                .background(period == p ? PopoverColors.segmentedSelected : Color.clear)
+                                .background(period == p ? theme.selection : Color.clear)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
                     }
                 }
                 .padding(1)
-                .background(PopoverColors.segmentedBg)
+                .background(theme.stripedRow) // Use stripeRow or selection style
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color(white: 0.25), lineWidth: 0.5))
+                .overlay(Capsule().stroke(theme.border, lineWidth: 0.5))
             }
             .padding(.horizontal, 12)
             .padding(.top, 8) // Reduced from 12
             .padding(.bottom, 6) // Reduced from 10
             
-            Divider().background(PopoverColors.divider)
+            Divider().background(theme.border)
 
             let summary = store.summaryForPeriod(period)
 
@@ -68,10 +59,10 @@ struct PopoverView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Total Tokens")
                         .font(.system(size: 10))
-                        .foregroundStyle(PopoverColors.textSecondary)
+                        .foregroundStyle(theme.secondaryForeground)
                     Text(formatLargeNumber(summary.totalTokens))
                         .font(.system(size: 24, weight: .bold)) // Reduced from 28
-                        .foregroundStyle(PopoverColors.textMain)
+                        .foregroundStyle(theme.foreground)
                 }
                 
                 Spacer()
@@ -79,10 +70,10 @@ struct PopoverView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Total Cost")
                         .font(.system(size: 10))
-                        .foregroundStyle(PopoverColors.textSecondary)
+                        .foregroundStyle(theme.secondaryForeground)
                     Text(Formatting.formatCost(summary.totalCost))
                         .font(.system(size: 24, weight: .bold)) // Reduced from 28
-                        .foregroundStyle(PopoverColors.greenAccent)
+                        .foregroundStyle(Color.green)
                 }
                 .frame(width: 110, alignment: .leading) // Increased from 90 to support 3-digit amounts
             }
@@ -95,7 +86,7 @@ struct PopoverView: View {
                     if summary.clients.isEmpty {
                         Text("No activity")
                             .font(.system(size: 11))
-                            .foregroundStyle(PopoverColors.textSecondary)
+                            .foregroundStyle(theme.secondaryForeground)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 10)
                     } else {
@@ -108,24 +99,24 @@ struct PopoverView: View {
                                 Text(AppColors.clientDisplayName(c.client))
                                     .font(.system(size: 11))
                                     .lineLimit(1)
-                                    .foregroundStyle(PopoverColors.textMain)
+                                    .foregroundStyle(theme.foreground)
                                 
                                 Spacer(minLength: 4)
                                 
                                 Text(formatLargeNumber(c.tokens))
                                     .font(.system(size: 11, design: .monospaced)) 
                                     .lineLimit(1)
-                                    .foregroundStyle(PopoverColors.textMain)
+                                    .foregroundStyle(theme.foreground)
                                     .frame(width: 44, alignment: .leading)
                                 
                                 HStack(spacing: 2) {
                                     Text(Formatting.formatCost(c.cost))
                                         .font(.system(size: 11, design: .monospaced))
                                         .lineLimit(1)
-                                        .foregroundStyle(PopoverColors.textMain)
+                                        .foregroundStyle(theme.foreground)
                                     Text("tok")
                                         .font(.system(size: 9)) 
-                                        .foregroundStyle(PopoverColors.textSecondary)
+                                        .foregroundStyle(theme.secondaryForeground)
                                 }
                                 .frame(width: 68, alignment: .trailing)
                             }
@@ -140,13 +131,13 @@ struct PopoverView: View {
             Spacer(minLength: 0)
 
             // MARK: - Continuous Bar Chart
-            ContinuousBarChart(summary: summary)
+            ContinuousBarChart(summary: summary, theme: theme)
                 .frame(height: 8) 
                 .padding(.horizontal, 12)
                 .padding(.bottom, 6)
 
             // MARK: - Footer
-            Divider().background(PopoverColors.divider)
+            Divider().background(theme.border)
             HStack {
                 Button(action: {
                     openWindow(id: "dashboard")
@@ -154,7 +145,7 @@ struct PopoverView: View {
                 }) {
                     Text("dashboard →")
                         .font(.system(size: 11, weight: .medium)) // Bolder font
-                        .foregroundStyle(Color.white.opacity(0.85)) // Brighter, clearer color than textSecondary
+                        .foregroundStyle(theme.accent)
                 }
                 .buttonStyle(.plain)
                 .padding(.vertical, 2) // Extra touch area
@@ -164,15 +155,15 @@ struct PopoverView: View {
                 if let last = store.lastRefresh {
                     Text(timeAgo(last))
                         .font(.system(size: 10))
-                        .foregroundStyle(PopoverColors.textSecondary)
+                        .foregroundStyle(theme.secondaryForeground)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8) // Increased vertical padding to make footer taller and clearer
         }
         .frame(width: 300, height: 200) 
-        .background(PopoverColors.bg)
-        .preferredColorScheme(.dark)
+        .background(theme.panelBackground)
+        .foregroundStyle(theme.foreground)
         .task { await store.refreshAll() }
     }
     
@@ -199,6 +190,7 @@ struct PopoverView: View {
 // MARK: - Continuous Stacked Bar
 struct ContinuousBarChart: View {
     let summary: TodaySummary
+    let theme: Theme // Added theme property
     
     var body: some View {
         GeometryReader { geo in
@@ -208,7 +200,7 @@ struct ContinuousBarChart: View {
             HStack(spacing: 2) {
                 if summary.clients.isEmpty {
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(PopoverColors.panelBg)
+                        .fill(theme.border) // Fallback if no clients
                 } else {
                     ForEach(summary.clients) { c in
                         let w = width * (Double(c.tokens) / total)
@@ -224,7 +216,7 @@ struct ContinuousBarChart: View {
                 
                 Text(summary.periodLabel)
                     .font(.system(size: 11))
-                    .foregroundStyle(PopoverColors.textSecondary)
+                    .foregroundStyle(Color.gray)
                     .padding(.leading, 4)
             }
         }

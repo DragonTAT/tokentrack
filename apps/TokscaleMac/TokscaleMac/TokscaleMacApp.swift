@@ -10,13 +10,22 @@ extension Notification.Name {
 struct TokscaleMacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var store = DataStore()
+    @State private var settings = AppSettings.shared
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.colorScheme) private var systemColorScheme
+
+    private var currentTheme: Theme {
+        // Decide the scheme to use
+        let scheme = settings.colorScheme ?? systemColorScheme
+        return Theme.from(settings.themeName, scheme: scheme)
+    }
 
     var body: some Scene {
         // Menu bar popover
         MenuBarExtra {
             PopoverView()
                 .environment(store)
+                .environment(\.theme, currentTheme)
                 .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
                     openWindow(id: "settings")
                     NSApp.activate(ignoringOtherApps: true)
@@ -30,7 +39,9 @@ struct TokscaleMacApp: App {
         Window("TokenTrack", id: "dashboard") {
             DashboardView()
                 .environment(store)
+                .environment(\.theme, currentTheme)
                 .frame(minWidth: 600, idealWidth: 800, minHeight: 400, idealHeight: 533)
+                .preferredColorScheme(settings.colorScheme)
         }
         .defaultSize(width: 800, height: 533)
 
@@ -38,6 +49,7 @@ struct TokscaleMacApp: App {
         Window("Settings", id: "settings") {
             SettingsView()
                 .environment(store)
+                .environment(\.theme, currentTheme)
         }
         .windowResizability(.contentSize)
     }

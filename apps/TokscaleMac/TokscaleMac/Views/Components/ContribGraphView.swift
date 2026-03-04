@@ -2,6 +2,7 @@ import SwiftUI
 
 /// 52-week contribution graph rendered with Canvas, matching stats.rs.
 struct ContribGraphView: View {
+    @Environment(\.theme) private var theme
     @Environment(DataStore.self) private var store
     @Binding var selectedCell: (week: Int, day: Int)?
     let cellWidth: CGFloat = 12
@@ -12,7 +13,7 @@ struct ContribGraphView: View {
 
     var body: some View {
         guard let grid = store.graphGrid else {
-            return AnyView(Text("No graph data").foregroundStyle(AppColors.muted).font(.system(size: 12, design: .monospaced)))
+            return AnyView(Text("No graph data").foregroundStyle(theme.secondaryForeground).font(.system(size: 12, design: .monospaced)))
         }
 
         let labelW: CGFloat = 28
@@ -33,7 +34,7 @@ struct ContribGraphView: View {
                                 lastMonth = m
                                 let x = labelW + CGFloat(wi) * (cellWidth + gap)
                                 context.draw(
-                                    Text(monthLabels[m]).font(.system(size: 9, design: .monospaced)).foregroundStyle(AppColors.muted),
+                                    Text(monthLabels[m]).font(.system(size: 9, design: .monospaced)).foregroundStyle(theme.secondaryForeground),
                                     at: CGPoint(x: x + cellWidth / 2, y: 6),
                                     anchor: .center
                                 )
@@ -46,7 +47,7 @@ struct ContribGraphView: View {
                 for (di, label) in dayLabels.enumerated() where di % 2 == 1 {
                     let y = graphStartY + CGFloat(di) * (cellWidth + gap) + cellWidth / 2
                     context.draw(
-                        Text(label).font(.system(size: 8, design: .monospaced)).foregroundStyle(AppColors.muted),
+                        Text(label).font(.system(size: 8, design: .monospaced)).foregroundStyle(theme.secondaryForeground),
                         at: CGPoint(x: 14, y: y),
                         anchor: .center
                     )
@@ -63,16 +64,15 @@ struct ContribGraphView: View {
                         if let day = dayOpt {
                             let color = store.currentTheme.intensityColor(day.intensity)
                             if isSelected {
-                                context.fill(RoundedRectangle(cornerRadius: 2).path(in: rect), with: .color(.white))
+                                context.fill(RoundedRectangle(cornerRadius: 2).path(in: rect), with: .color(theme.foreground))
                                 let inner = rect.insetBy(dx: 1, dy: 1)
                                 context.fill(RoundedRectangle(cornerRadius: 1).path(in: inner), with: .color(color))
                             } else {
                                 context.fill(RoundedRectangle(cornerRadius: 2).path(in: rect), with: .color(color))
                             }
-                        } else {
                             // Empty cell (dot)
                             let dotRect = CGRect(x: x + cellWidth/2 - 1, y: y + cellWidth/2 - 1, width: 2, height: 2)
-                            context.fill(Circle().path(in: dotRect), with: .color(Color(white: 0.4)))
+                            context.fill(Circle().path(in: dotRect), with: .color(theme.border))
                         }
                     }
                 }
